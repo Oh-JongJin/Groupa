@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>A Windows 11 taskbar quick launcher with jump list style popup</b>
+  <b>Windows 11 작업 표시줄용 퀵 런처</b>
 </p>
 
 <p align="center">
@@ -16,50 +16,46 @@
 
 ---
 
-## ✨ Features
+작업 표시줄에 고정해두고, 클릭하면 자주 쓰는 앱 목록이 점프 리스트처럼 팝업으로 뜹니다.
 
-- 🚀 **Quick Launch** — Pin your favorite apps to a taskbar popup for instant access
-- 🎨 **Auto Theme** — Automatically follows Windows light/dark mode
-- 🌍 **Multi-Language** — Auto-detects Windows display language (English / 한국어)
-- 📌 **Taskbar Anchored** — Popup appears right above the taskbar icon, just like native Windows jump lists
-- ⚡ **Lightweight** — Single exe (~800KB), no installation required
-- 🔧 **Configurable** — Add, remove, and reorder apps through the built-in settings editor
+## Features
 
-## 📸 Screenshots
+- 작업 표시줄 아이콘 바로 위에 팝업이 표시됨
+- Windows 다크/라이트 모드 자동 감지
+- OS 표시 언어에 따라 한국어/영어 자동 전환
+- 단일 exe (~1MB), 별도 설치 불필요
+- GUI 설정 에디터로 앱 추가/삭제/정렬 가능
+
+## Screenshots
 
 | Dark Mode | Light Mode |
 |:---------:|:----------:|
 | ![Dark](docs/screenshot_dark.png) | ![Light](docs/screenshot_light.png) |
 
-## 📦 Installation
+## Installation
 
-### Requirements
+**Requirements**
 - Windows 10/11 (64-bit)
 - [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
 
-### Download
-1. Download the latest release from [Releases](https://github.com/Oh-JongJin/Groupa/releases)
-2. Extract to any folder
-3. Run `Groupa.exe`
-4. (Optional) Pin to taskbar for quick access
+**Download**
+1. [Releases](https://github.com/Oh-JongJin/Groupa/releases) 페이지에서 최신 버전 다운로드
+2. 원하는 폴더에 압축 해제
+3. `Groupa.exe` 실행
+4. 작업 표시줄에 고정하면 편하게 사용 가능
 
-## 🔧 Build from Source
+## Build from Source
 
 ```bash
-# Clone
 git clone https://github.com/Oh-JongJin/Groupa.git
 cd Groupa
-
-# Build
 dotnet publish -c Release -r win-x64
-
-# Output
 # bin/Release/net8.0-windows/win-x64/publish/Groupa.exe
 ```
 
-## ⚙️ Configuration
+## Configuration
 
-Apps are stored in `config.json` (auto-generated on first run):
+앱 목록은 `config.json`에 저장됩니다 (최초 실행 시 자동 생성):
 
 ```json
 {
@@ -72,28 +68,21 @@ Apps are stored in `config.json` (auto-generated on first run):
 }
 ```
 
-- **`name`**: Leave empty for auto-detection (follows OS language), or set a custom name
-- **`path`**: Full path or filename (searches PATH automatically)
+- `name` — 비워두면 OS 언어에 맞춰 자동 감지 (예: `notepad.exe` → "메모장" / "Notepad")
+- `path` — 전체 경로 또는 파일명 (PATH 자동 검색)
 
-## 🌍 Localization
+팝업 하단의 **그룹 설정** 버튼을 누르면 GUI로도 편집할 수 있습니다.
 
-Groupa automatically detects the Windows display language:
+## Tech Stack
 
-| Windows Language | UI |
-|:---:|:---:|
-| 🇰🇷 한국어 | 그룹 설정, 닫기, ... |
-| 🇺🇸 English (default) | Settings, Close, ... |
+| | |
+|---|---|
+| Framework | .NET 8.0 / WPF |
+| UI | Windows 11 Fluent Design (Mica/Acrylic, rounded corners) |
+| Icon Extraction | Shell32 `SHGetFileInfoW` |
+| Taskbar Detection | UI Automation API |
+| Theme | DWM `DwmSetWindowAttribute` |
 
-App names are also auto-localized (e.g., `notepad.exe` → "Notepad" / "메모장").
+## License
 
-## 🛠️ Tech Stack
-
-- **Framework**: .NET 8.0 / WPF
-- **UI**: Windows 11 Fluent Design (Mica/Acrylic backdrop, rounded corners)
-- **Icon Extraction**: Shell32 `SHGetFileInfoW`
-- **Taskbar Detection**: UI Automation API
-- **Theme**: DWM `DwmSetWindowAttribute` (dark/light auto-detect)
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License — [LICENSE](LICENSE) 참고.
