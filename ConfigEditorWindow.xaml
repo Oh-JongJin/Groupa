@@ -1,0 +1,103 @@
+<Window x:Class="JumpListLauncher.ConfigEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Name="EditorWindow"
+        Width="520" Height="480"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize">
+    <Window.Resources>
+        <Style TargetType="Button" x:Key="EditorButton">
+            <Setter Property="Background" Value="{DynamicResource EditorButtonBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ItemForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource EditorButtonHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource EditorButtonPressed}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="TextBox" x:Key="EditorTextBox">
+            <Setter Property="Background" Value="{DynamicResource EditorInputBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ItemForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource ItemForeground}"/>
+        </Style>
+        <Style TargetType="ListBox" x:Key="EditorListBox">
+            <Setter Property="Background" Value="{DynamicResource EditorInputBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ItemForeground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock x:Name="LblGroupName" Foreground="{DynamicResource HeaderForeground}" FontFamily="Segoe UI" FontSize="12" Margin="0,0,0,6"/>
+            <TextBox x:Name="GroupNameBox" Style="{StaticResource EditorTextBox}"/>
+        </StackPanel>
+
+        <TextBlock x:Name="LblAppList" Grid.Row="1" Foreground="{DynamicResource HeaderForeground}" FontFamily="Segoe UI" FontSize="12" Margin="0,0,0,6"/>
+
+        <ListBox Grid.Row="2" x:Name="AppListBox" Style="{StaticResource EditorListBox}" 
+                 DisplayMemberPath="DisplayText" Margin="0,0,0,12"
+                 SelectionMode="Single">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Foreground" Value="{DynamicResource ItemForeground}"/>
+                    <Setter Property="Padding" Value="8,4"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource EditorSelectedBg}"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </ListBox.ItemContainerStyle>
+        </ListBox>
+
+        <WrapPanel Grid.Row="3" Margin="0,0,0,16" HorizontalAlignment="Left">
+            <Button x:Name="BtnAdd" Style="{StaticResource EditorButton}" Click="AddApp_Click" Margin="0,0,8,0"/>
+            <Button x:Name="BtnRemove" Style="{StaticResource EditorButton}" Click="RemoveApp_Click" Margin="0,0,8,0"/>
+            <Button x:Name="BtnUp" Style="{StaticResource EditorButton}" Click="MoveUp_Click" Margin="0,0,8,0"/>
+            <Button x:Name="BtnDown" Style="{StaticResource EditorButton}" Click="MoveDown_Click" Margin="0,0,8,0"/>
+        </WrapPanel>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="BtnSave" Style="{StaticResource EditorButton}" Click="Save_Click" Width="80" Margin="0,0,8,0"/>
+            <Button x:Name="BtnCancel" Style="{StaticResource EditorButton}" Click="Cancel_Click" Width="80"/>
+        </StackPanel>
+    </Grid>
+</Window>

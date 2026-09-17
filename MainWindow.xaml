@@ -1,0 +1,46 @@
+<Window x:Class="JumpListLauncher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:JumpListLauncher"
+        mc:Ignorable="d"
+        WindowStyle="None"
+        Background="#012C2C2C"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight"
+        Topmost="True"
+        Title="JumpListLauncher"
+        MinWidth="280">
+
+    <Border x:Name="MainBorder" 
+            CornerRadius="8" 
+            Background="{DynamicResource PopupBackground}" 
+            BorderBrush="{DynamicResource PopupBorder}" 
+            BorderThickness="1" 
+            Padding="4,4,4,8">
+        <StackPanel>
+            <TextBlock x:Name="HeaderText" Style="{DynamicResource HeaderText}" />
+            <Rectangle Style="{DynamicResource MenuSeparator}" />
+            
+            <ItemsControl x:Name="AppList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Style="{DynamicResource MenuItemButton}" 
+                                Content="{Binding Name}" 
+                                Tag="{Binding Icon}" 
+                                Click="AppItem_Click" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            
+            <Rectangle Style="{DynamicResource MenuSeparator}" />
+            
+            <StackPanel>
+                <Button x:Name="BtnSettings" Style="{DynamicResource FooterButton}" Click="Settings_Click" />
+                <Button x:Name="BtnClose" Style="{DynamicResource FooterButton}" Click="Close_Click" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

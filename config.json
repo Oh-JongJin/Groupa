@@ -1,0 +1,9 @@
+{
+  "group_name": "Groupa",
+  "apps": [
+    { "name": "크롬 브라우저", "path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" },
+    { "name": "메모장", "path": "C:\\Windows\\System32\\notepad.exe" },
+    { "name": "계산기", "path": "calc.exe" },
+    { "name": "파일 탐색기", "path": "C:\\Windows\\explorer.exe" }
+  ]
+}
