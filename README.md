@@ -39,11 +39,11 @@ Pin it to your taskbar — click to pop up a list of your favorite apps, just li
 **Requirements**
 - Windows 10 or later (64-bit)
 
-**Download**
+**How to Use**
 1. Download the latest version from [Releases](https://github.com/Oh-JongJin/Groupa/releases)
 2. Extract to any folder
-3. Run `Groupa.exe`
-4. Pin to taskbar for quick access
+3. Move `Groupa.exe` to the taskbar
+4. Click on the taskbar to use
 
 ## Build from Source
 ```bash

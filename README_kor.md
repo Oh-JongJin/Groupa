@@ -39,11 +39,11 @@
 **요구 사항**
 - Windows 10 ~ (64비트)
 
-**다운로드**
+**사용 방법**
 1. [Releases](https://github.com/Oh-JongJin/Groupa/releases) 페이지에서 최신 버전 다운로드
 2. 원하는 폴더에 압축 해제
-3. `Groupa.exe` 실행
-4. 작업 표시줄에 고정하여 사용
+3. `Groupa.exe` 파일을 작업 표시줄로 이동
+4. 작업 표시줄에서 클릭하여 사용
 
 ## Build from Source
 ```bash
