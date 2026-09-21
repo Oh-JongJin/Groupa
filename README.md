@@ -32,11 +32,6 @@ Pin it to your taskbar — click to pop up a list of your favorite apps, just li
 - Single exe (~1MB), no installation required
 - Built-in settings editor to add, remove, and reorder apps
 
-## Screenshots
-
-| Dark Mode | Light Mode |
-|:---------:|:----------:|
-| ![Dark](docs/screenshot_dark.png) | ![Light](docs/screenshot_light.png) |
 
 ## Installation
 **Requirements**

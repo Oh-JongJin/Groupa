@@ -32,11 +32,6 @@
 - 단일 exe (~1MB), 별도 설치 불필요
 - GUI 설정 에디터로 앱 추가/삭제/정렬 가능
 
-## Screenshots
-
-| Dark Mode | Light Mode |
-|:---------:|:----------:|
-| ![Dark](docs/screenshot_dark.png) | ![Light](docs/screenshot_light.png) |
 
 ## Installation
 **요구 사항**
