@@ -22,6 +22,9 @@
 
 작업 표시줄에 고정해두고, 클릭하면 자주 쓰는 앱 목록이 점프 리스트처럼 팝업으로 뜹니다.
 
+## Demo
+![Groupa Demo](docs/howtouse.gif)
+
 ## Features
 - 작업 표시줄 아이콘 바로 위에 팝업이 표시됨
 - Windows 다크/라이트 모드 자동 감지

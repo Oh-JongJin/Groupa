@@ -22,6 +22,9 @@
 
 Pin it to your taskbar — click to pop up a list of your favorite apps, just like a jump list.
 
+## Demo
+![Groupa Demo](docs/howtouse.gif)
+
 ## Features
 - Popup appears right above the taskbar icon
 - Automatically follows Windows dark/light mode
