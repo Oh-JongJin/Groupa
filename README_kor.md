@@ -14,7 +14,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-8.0-blue?logo=dotnet" alt=".NET 8" />
-  <img src="https://img.shields.io/badge/platform-Windows%2011-0078D4?logo=windows" alt="Windows 11" />
+  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4?logo=windows" alt="Windows 10/11" />
   <img src="https://img.shields.io/github/license/Oh-JongJin/Groupa" alt="License" />
 </p>
 
