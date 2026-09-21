@@ -1,11 +1,15 @@
 # Groupa
 
 <p align="center">
+  <a href="README_kor.md">한국어</a> | <b>English</b>
+</p>
+
+<p align="center">
   <img src="docs/groupa_icon.png" alt="Groupa Icon" width="128" />
 </p>
 
 <p align="center">
-  <b>A Windows 11 taskbar quick launcher with jump list style popup</b>
+  <b>Windows Taskbar Quick Launcher</b>
 </p>
 
 <p align="center">
@@ -16,49 +20,41 @@
 
 ---
 
-## ✨ Features
+Pin it to your taskbar — click to pop up a list of your favorite apps, just like a jump list.
 
-- 🚀 **Quick Launch** — Pin your favorite apps to a taskbar popup for instant access
-- 🎨 **Auto Theme** — Automatically follows Windows light/dark mode
-- 🌍 **Multi-Language** — Auto-detects Windows display language (English / 한국어)
-- 📌 **Taskbar Anchored** — Popup appears right above the taskbar icon, just like native Windows jump lists
-- ⚡ **Lightweight** — Single exe (~800KB), no installation required
-- 🔧 **Configurable** — Add, remove, and reorder apps through the built-in settings editor
+## Features
+- Popup appears right above the taskbar icon
+- Automatically follows Windows dark/light mode
+- Auto-detects OS display language (English / 한국어)
+- Single exe (~1MB), no installation required
+- Built-in settings editor to add, remove, and reorder apps
 
-## 📸 Screenshots
+## Screenshots
 
 | Dark Mode | Light Mode |
 |:---------:|:----------:|
 | ![Dark](docs/screenshot_dark.png) | ![Light](docs/screenshot_light.png) |
 
-## 📦 Installation
+## Installation
+**Requirements**
+- Windows 10 or later (64-bit)
 
-### Requirements
-- Windows 10/11 (64-bit)
-- [.NET 8.0 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
-
-### Download
-1. Download the latest release from [Releases](https://github.com/Oh-JongJin/Groupa/releases)
+**Download**
+1. Download the latest version from [Releases](https://github.com/Oh-JongJin/Groupa/releases)
 2. Extract to any folder
 3. Run `Groupa.exe`
-4. (Optional) Pin to taskbar for quick access
+4. Pin to taskbar for quick access
 
-## 🔧 Build from Source
-
+## Build from Source
 ```bash
-# Clone
 git clone https://github.com/Oh-JongJin/Groupa.git
 cd Groupa
-
-# Build
 dotnet publish -c Release -r win-x64
-
-# Output
-# bin/Release/net8.0-windows/win-x64/publish/Groupa.exe
 ```
 
-## ⚙️ Configuration
+Output: `bin/Release/net8.0-windows/win-x64/publish/Groupa.exe`
 
+## Configuration
 Apps are stored in `config.json` (auto-generated on first run):
 
 ```json
@@ -72,28 +68,15 @@ Apps are stored in `config.json` (auto-generated on first run):
 }
 ```
 
-- **`name`**: Leave empty for auto-detection (follows OS language), or set a custom name
-- **`path`**: Full path or filename (searches PATH automatically)
+- `name` — Leave empty for auto-detection (follows OS language), or set a custom name
+- `path` — Full path or filename (searches PATH automatically)
 
-## 🌍 Localization
+## Tech Stack
+- .NET 8.0 / WPF
+- Windows 11 Fluent Design (Mica backdrop, rounded corners)
+- Shell32 `SHGetFileInfoW` for icon extraction
+- UI Automation API for taskbar detection
+- DWM `DwmSetWindowAttribute` for theme switching
 
-Groupa automatically detects the Windows display language:
-
-| Windows Language | UI |
-|:---:|:---:|
-| 🇰🇷 한국어 | 그룹 설정, 닫기, ... |
-| 🇺🇸 English (default) | Settings, Close, ... |
-
-App names are also auto-localized (e.g., `notepad.exe` → "Notepad" / "메모장").
-
-## 🛠️ Tech Stack
-
-- **Framework**: .NET 8.0 / WPF
-- **UI**: Windows 11 Fluent Design (Mica/Acrylic backdrop, rounded corners)
-- **Icon Extraction**: Shell32 `SHGetFileInfoW`
-- **Taskbar Detection**: UI Automation API
-- **Theme**: DWM `DwmSetWindowAttribute` (dark/light auto-detect)
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## License
+MIT License
