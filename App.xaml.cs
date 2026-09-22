@@ -1,6 +1,9 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Shell;
 using JumpListLauncher.Helpers;
 
 namespace JumpListLauncher;
@@ -11,8 +14,14 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // Detect system theme
-        IsDarkMode = ThemeHelper.IsDarkMode();
+        // Load preferences
+        var prefs = PreferencesHelper.Load();
+
+        // Apply language preference (must be before any Strings.Get() call)
+        Strings.SetLanguage(prefs.Language);
+
+        // Detect theme (respects preference: system/dark/light)
+        IsDarkMode = PreferencesHelper.ResolveDarkMode(prefs);
 
         // Load the correct theme dictionary
         var themeUri = IsDarkMode
@@ -24,5 +33,57 @@ public partial class App : Application
         Task.Run(() => WindowPositioner.PreFindTaskbarButton());
 
         base.OnStartup(e);
+
+        // Register Jump List (right-click menu on taskbar)
+        RegisterJumpList();
+
+        // Handle command-line arguments
+        if (e.Args.Length > 0)
+        {
+            var configPath = AppPaths.ConfigPath;
+
+            if (e.Args[0] == "--settings")
+            {
+                var editor = new ConfigEditorWindow(configPath);
+                editor.ShowDialog();
+                Shutdown();
+                return;
+            }
+            else if (e.Args[0] == "--preferences")
+            {
+                var prefsWindow = new PreferencesWindow();
+                prefsWindow.ShowDialog();
+                Shutdown();
+                return;
+            }
+        }
+    }
+
+    private void RegisterJumpList()
+    {
+        var exePath = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+        var jumpList = new JumpList();
+
+        var settingsTask = new JumpTask
+        {
+            Title = Strings.Get("EditorTitle"),
+            Description = Strings.Get("EditorTitle"),
+            ApplicationPath = exePath,
+            Arguments = "--settings",
+            CustomCategory = ""
+        };
+
+        var prefsTask = new JumpTask
+        {
+            Title = Strings.Get("Preferences"),
+            Description = Strings.Get("Preferences"),
+            ApplicationPath = exePath,
+            Arguments = "--preferences",
+            CustomCategory = ""
+        };
+
+        jumpList.JumpItems.Add(settingsTask);
+        jumpList.JumpItems.Add(prefsTask);
+        JumpList.SetJumpList(this, jumpList);
     }
 }

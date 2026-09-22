@@ -39,7 +39,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        _configPath = System.IO.Path.Combine(AppContext.BaseDirectory, "config.json");
+        _configPath = AppPaths.ConfigPath;
 
         // Apply localized strings
         BtnSettings.Content = Strings.Get("Settings");
@@ -65,9 +65,12 @@ public partial class MainWindow : Window
             Top = _bottomAnchorY - ActualHeight;
             Left = _iconCenterX - (ActualWidth / 2.0);
 
-            // Clamp left to screen
-            double workLeft = SystemParameters.WorkArea.Left;
-            double workWidth = SystemParameters.WorkArea.Width;
+            // Clamp left to current monitor work area
+            var workArea = WindowPositioner.GetCurrentMonitorWorkArea();
+            var src = PresentationSource.FromVisual(this);
+            double dpiX = src?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            double workLeft = workArea.Left / dpiX;
+            double workWidth = workArea.Width / dpiX;
             if (Left < workLeft + 8) Left = workLeft + 8;
             if (Left + ActualWidth > workLeft + workWidth - 8)
                 Left = workLeft + workWidth - ActualWidth - 8;

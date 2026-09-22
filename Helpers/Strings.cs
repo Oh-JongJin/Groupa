@@ -21,6 +21,16 @@ public static class Strings
         ["ErrorLoad"]      = "설정 불러오기 실패",
         ["ErrorLaunch"]    = "실행 실패",
         ["Error"]          = "오류",
+        ["Preferences"]    = "환경 설정",
+        ["ThemeLabel"]     = "테마",
+        ["ThemeSystem"]    = "시스템 설정",
+        ["ThemeDark"]      = "다크",
+        ["ThemeLight"]     = "라이트",
+        ["LanguageLabel"]  = "언어",
+        ["LangSystem"]     = "시스템 설정",
+        ["LangKorean"]     = "한국어",
+        ["LangEnglish"]    = "English",
+        ["RestartNotice"]  = "변경 사항은 다음 실행 시 적용됩니다.",
     };
 
     private static readonly Dictionary<string, string> En = new()
@@ -39,9 +49,29 @@ public static class Strings
         ["ErrorLoad"]      = "Failed to load config",
         ["ErrorLaunch"]    = "Failed to launch",
         ["Error"]          = "Error",
+        ["Preferences"]    = "Preferences",
+        ["ThemeLabel"]     = "Theme",
+        ["ThemeSystem"]    = "System",
+        ["ThemeDark"]      = "Dark",
+        ["ThemeLight"]     = "Light",
+        ["LanguageLabel"]  = "Language",
+        ["LangSystem"]     = "System",
+        ["LangKorean"]     = "한국어",
+        ["LangEnglish"]    = "English",
+        ["RestartNotice"]  = "Changes will be applied on next launch.",
     };
 
     private static Dictionary<string, string>? _current;
+    private static string? _forcedLang;
+
+    /// <summary>
+    /// Set forced language from preferences. Call before any Get().
+    /// </summary>
+    public static void SetLanguage(string lang)
+    {
+        _forcedLang = lang;
+        _current = null; // reset cache
+    }
 
     private static Dictionary<string, string> Current
     {
@@ -49,8 +79,12 @@ public static class Strings
         {
             if (_current == null)
             {
-                // Use Windows display language (changes when user switches in Settings)
-                var lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+                string lang;
+                if (!string.IsNullOrEmpty(_forcedLang) && _forcedLang != "system")
+                    lang = _forcedLang;
+                else
+                    lang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+
                 _current = lang == "ko" ? Ko : En;
             }
             return _current;
@@ -61,4 +95,6 @@ public static class Strings
     {
         return Current.TryGetValue(key, out var value) ? value : key;
     }
+
+    public static bool IsKorean => Current == Ko;
 }
