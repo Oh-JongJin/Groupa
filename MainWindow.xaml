@@ -27,10 +27,46 @@
             <ItemsControl x:Name="AppList">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Button Style="{DynamicResource MenuItemButton}" 
-                                Content="{Binding Name}" 
-                                Tag="{Binding Icon}" 
-                                Click="AppItem_Click" />
+                        <Grid>
+                            <Button Style="{DynamicResource MenuItemButton}" 
+                                    Content="{Binding Name}" 
+                                    Tag="{Binding Icon}" 
+                                    Click="AppItem_Click"
+                                    HorizontalContentAlignment="Left"/>
+                            <Button x:Name="DeleteBtn"
+                                    Content="✕" 
+                                    HorizontalAlignment="Right" 
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0"
+                                    FontSize="12"
+                                    Width="24" Height="24"
+                                    Cursor="Hand"
+                                    Opacity="0"
+                                    Click="DeleteItem_Click"
+                                    Foreground="{DynamicResource HeaderForeground}"
+                                    Background="Transparent"
+                                    BorderThickness="0"/>
+                            <Grid.Triggers>
+                                <EventTrigger RoutedEvent="Mouse.MouseEnter">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="DeleteBtn" 
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="1" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                                <EventTrigger RoutedEvent="Mouse.MouseLeave">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="DeleteBtn" 
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Grid.Triggers>
+                        </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

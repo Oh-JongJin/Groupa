@@ -231,6 +231,35 @@ public partial class MainWindow : Window
         Activate();
     }
 
+    private void DeleteItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.DataContext is AppDisplayItem item)
+        {
+            try
+            {
+                // Remove from config.json
+                var configJson = File.ReadAllText(_configPath);
+                var config = JsonSerializer.Deserialize<AppConfig>(configJson);
+                if (config != null)
+                {
+                    config.Apps.RemoveAll(a => a.Path == item.Path);
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                    };
+                    File.WriteAllText(_configPath, JsonSerializer.Serialize(config, options));
+                }
+
+                // Remove from display list
+                _displayItems?.Remove(item);
+                AppList.ItemsSource = null;
+                AppList.ItemsSource = _displayItems;
+            }
+            catch { }
+        }
+    }
+
     private void Close_Click(object sender, RoutedEventArgs e)
     {
         Close();
