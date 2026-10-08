@@ -60,19 +60,32 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Group Selector -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock x:Name="LblGroupName" Foreground="{DynamicResource HeaderForeground}" FontFamily="Segoe UI" FontSize="12" Margin="0,0,0,6"/>
-            <TextBox x:Name="GroupNameBox" Style="{StaticResource EditorTextBox}"/>
+            <TextBlock x:Name="LblGroup" Text="Group" Foreground="{DynamicResource HeaderForeground}" FontFamily="Segoe UI" FontSize="12" Margin="0,0,0,6"/>
+            <DockPanel>
+                <Button x:Name="BtnDeleteGroup" DockPanel.Dock="Right" Style="{StaticResource EditorButton}" Click="DeleteGroup_Click" Margin="8,0,0,0"/>
+                <Button x:Name="BtnAddGroup" DockPanel.Dock="Right" Style="{StaticResource EditorButton}" Click="AddGroup_Click" Margin="8,0,0,0"/>
+                <ComboBox x:Name="CmbGroup" FontSize="13" Height="30" VerticalContentAlignment="Center"
+                          SelectionChanged="CmbGroup_SelectionChanged"/>
+            </DockPanel>
         </StackPanel>
 
-        <TextBlock x:Name="LblAppList" Grid.Row="1" Foreground="{DynamicResource HeaderForeground}" FontFamily="Segoe UI" FontSize="12" Margin="0,0,0,6"/>
+        <!-- Group Name -->
+        <StackPanel Grid.Row="1" Margin="0,0,0,12">
+            <TextBlock x:Name="LblGroupName" Foreground="{DynamicResource HeaderForeground}" FontFamily="Segoe UI" FontSize="12" Margin="0,0,0,6"/>
+            <TextBox x:Name="GroupNameBox" Style="{StaticResource EditorTextBox}" TextChanged="GroupNameBox_TextChanged"/>
+        </StackPanel>
 
-        <ListBox Grid.Row="2" x:Name="AppListBox" Style="{StaticResource EditorListBox}" 
+        <TextBlock x:Name="LblAppList" Grid.Row="2" Foreground="{DynamicResource HeaderForeground}" FontFamily="Segoe UI" FontSize="12" Margin="0,0,0,6"/>
+
+        <ListBox Grid.Row="3" x:Name="AppListBox" Style="{StaticResource EditorListBox}" 
                  DisplayMemberPath="DisplayText" Margin="0,0,0,12"
                  SelectionMode="Single">
             <ListBox.ItemContainerStyle>
@@ -88,14 +101,16 @@
             </ListBox.ItemContainerStyle>
         </ListBox>
 
-        <WrapPanel Grid.Row="3" Margin="0,0,0,16" HorizontalAlignment="Left">
+        <WrapPanel Grid.Row="4" Margin="0,0,0,16" HorizontalAlignment="Left">
             <Button x:Name="BtnAdd" Style="{StaticResource EditorButton}" Click="AddApp_Click" Margin="0,0,8,0"/>
+            <Button x:Name="BtnAddFolder" Style="{StaticResource EditorButton}" Click="AddFolder_Click" Margin="0,0,8,0"/>
+            <Button x:Name="BtnAddUrl" Style="{StaticResource EditorButton}" Click="AddUrl_Click" Margin="0,0,8,0"/>
             <Button x:Name="BtnRemove" Style="{StaticResource EditorButton}" Click="RemoveApp_Click" Margin="0,0,8,0"/>
             <Button x:Name="BtnUp" Style="{StaticResource EditorButton}" Click="MoveUp_Click" Margin="0,0,8,0"/>
             <Button x:Name="BtnDown" Style="{StaticResource EditorButton}" Click="MoveDown_Click" Margin="0,0,8,0"/>
         </WrapPanel>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="BtnSave" Style="{StaticResource EditorButton}" Click="Save_Click" Width="80" Margin="0,0,8,0"/>
             <Button x:Name="BtnCancel" Style="{StaticResource EditorButton}" Click="Cancel_Click" Width="80"/>
         </StackPanel>

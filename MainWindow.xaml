@@ -12,7 +12,8 @@
         SizeToContent="WidthAndHeight"
         Topmost="True"
         Title="JumpListLauncher"
-        MinWidth="280">
+        MinWidth="280"
+        MaxWidth="340">
 
     <Border x:Name="MainBorder" 
             CornerRadius="8" 
@@ -21,60 +22,123 @@
             BorderThickness="1" 
             Padding="4,4,4,8">
         <StackPanel>
-            <TextBlock x:Name="HeaderText" Style="{DynamicResource HeaderText}" />
-            <Rectangle Style="{DynamicResource MenuSeparator}" />
-            
-            <ItemsControl x:Name="AppList">
+            <!-- Group Tab Bar (hidden when only 1 group) -->
+            <ItemsControl x:Name="GroupTabs" Margin="8,8,8,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Grid>
-                            <Button Style="{DynamicResource MenuItemButton}" 
-                                    Content="{Binding Name}" 
-                                    Tag="{Binding Icon}" 
-                                    Click="AppItem_Click"
-                                    HorizontalContentAlignment="Left"/>
-                            <Button x:Name="DeleteBtn"
-                                    Content="✕" 
-                                    HorizontalAlignment="Right" 
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,8,0"
-                                    FontSize="12"
-                                    Width="24" Height="24"
-                                    Cursor="Hand"
-                                    Opacity="0"
-                                    Click="DeleteItem_Click"
-                                    Foreground="{DynamicResource HeaderForeground}"
-                                    Background="Transparent"
-                                    BorderThickness="0"/>
-                            <Grid.Triggers>
-                                <EventTrigger RoutedEvent="Mouse.MouseEnter">
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="DeleteBtn" 
-                                                             Storyboard.TargetProperty="Opacity"
-                                                             To="1" Duration="0:0:0.15"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </EventTrigger>
-                                <EventTrigger RoutedEvent="Mouse.MouseLeave">
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="DeleteBtn" 
-                                                             Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.15"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </EventTrigger>
-                            </Grid.Triggers>
-                        </Grid>
+                        <Border x:Name="TabBorder" CornerRadius="4" Padding="10,4" Margin="2,0"
+                                Cursor="Hand" 
+                                Background="Transparent"
+                                MouseLeftButtonDown="GroupTab_Click">
+                            <TextBlock Text="{Binding GroupName}" FontSize="12" FontFamily="Segoe UI"
+                                       Foreground="{DynamicResource HeaderForeground}"/>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource ItemHoverBackground}"/>
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource PopupBorder}"/>
+                                <Setter TargetName="TabBorder" Property="BorderThickness" Value="0,0,0,2"/>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <TextBlock x:Name="HeaderText" Style="{DynamicResource HeaderText}" />
+            <Rectangle Style="{DynamicResource MenuSeparator}" />
+            
+            <Grid>
+                <ListBox x:Name="AppList" 
+                         Background="Transparent" BorderThickness="0"
+                         AllowDrop="True"
+                         PreviewMouseLeftButtonDown="AppList_PreviewMouseDown"
+                         PreviewMouseMove="AppList_PreviewMouseMove"
+                         DragOver="AppList_DragOver"
+                         DragLeave="AppList_DragLeave"
+                         Drop="AppList_Drop"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Button Style="{DynamicResource MenuItemButton}" 
+                                        Content="{Binding Name}" 
+                                        Tag="{Binding Icon}" 
+                                        Click="AppItem_Click"
+                                        HorizontalContentAlignment="Left"/>
+                                <Button x:Name="DeleteBtn"
+                                        Content="✕" 
+                                        HorizontalAlignment="Right" 
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,8,0"
+                                        FontSize="12"
+                                        Width="24" Height="24"
+                                        Cursor="Hand"
+                                        Opacity="0"
+                                        Click="DeleteItem_Click"
+                                        Foreground="{DynamicResource HeaderForeground}"
+                                        Background="Transparent"
+                                        BorderThickness="0"/>
+                                <Grid.Triggers>
+                                    <EventTrigger RoutedEvent="Mouse.MouseEnter">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="DeleteBtn" 
+                                                                 Storyboard.TargetProperty="Opacity"
+                                                                 To="1" Duration="0:0:0.15"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                    <EventTrigger RoutedEvent="Mouse.MouseLeave">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="DeleteBtn" 
+                                                                 Storyboard.TargetProperty="Opacity"
+                                                                 To="0" Duration="0:0:0.15"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </Grid.Triggers>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <!-- Drop indicator line -->
+                <Rectangle x:Name="DropIndicator" 
+                           Height="2" 
+                           Fill="{DynamicResource PopupBorder}" 
+                           HorizontalAlignment="Stretch"
+                           VerticalAlignment="Top"
+                           Margin="12,0,12,0"
+                           IsHitTestVisible="False"
+                           Visibility="Collapsed"/>
+            </Grid>
             
             <Rectangle Style="{DynamicResource MenuSeparator}" />
             
             <StackPanel>
                 <Button x:Name="BtnSettings" Style="{DynamicResource FooterButton}" Click="Settings_Click" />
+                <Button x:Name="BtnPreferences" Style="{DynamicResource FooterButton}" Click="Preferences_Click" />
                 <Button x:Name="BtnClose" Style="{DynamicResource FooterButton}" Click="Close_Click" />
             </StackPanel>
         </StackPanel>

@@ -41,9 +41,29 @@ public static class IconExtractor
         if (string.IsNullOrWhiteSpace(path))
             return null;
 
-        // Skip URLs — no icon to extract
+        // For URLs — use shell32.dll globe icon
         if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var shinfo = new SHFILEINFO();
+                // Use a .url extension to get the default internet shortcut icon
+                SHGetFileInfoW(".url", 0x80, ref shinfo, (uint)Marshal.SizeOf(shinfo),
+                    SHGFI_ICON | SHGFI_SMALLICON | 0x10 /* SHGFI_USEFILEATTRIBUTES */);
+                if (shinfo.hIcon != IntPtr.Zero)
+                {
+                    var icon = System.Drawing.Icon.FromHandle(shinfo.hIcon);
+                    var bmp = Imaging.CreateBitmapSourceFromHIcon(
+                        icon.Handle,
+                        new Int32Rect(0, 0, icon.Width, icon.Height),
+                        BitmapSizeOptions.FromEmptyOptions());
+                    DestroyIcon(shinfo.hIcon);
+                    return bmp;
+                }
+            }
+            catch { }
             return null;
+        }
 
         try
         {

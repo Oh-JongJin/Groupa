@@ -38,7 +38,7 @@
                         <StackPanel Orientation="Horizontal">
                             <Image Source="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}" 
                                    Width="24" Height="24" Margin="0,0,12,0" />
-                            <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" />
+                            <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Border>
                     <ControlTemplate.Triggers>
