@@ -1,7 +1,7 @@
 # Groupa
 
 <p align="center">
-  <a href="README_kor.md">한국어</a> | <b>English</b>
+  <b>한국어</b> | <a href="README_eng.md">English</a>
 </p>
 
 <p align="center">
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <b>Windows Taskbar Quick Launcher</b>
+  <b>Windows 작업 표시줄 퀵 런처</b>
 </p>
 
 <p align="center">
@@ -20,28 +20,28 @@
 
 ---
 
-Pin it to your taskbar — click to pop up a list of your favorite apps, just like a jump list.
+작업 표시줄에 고정해두고, 클릭하면 자주 쓰는 앱 목록이 점프 리스트처럼 팝업으로 뜹니다.
 
 ## Demo
 ![Groupa Demo](docs/howtouse.gif)
 
 ## Features
-- Popup appears right above the taskbar icon
-- Automatically follows Windows dark/light mode
-- Auto-detects OS display language (English / 한국어)
-- Single exe, no installation required
-- Built-in settings editor to add, remove, and reorder apps
+- 작업 표시줄 아이콘 바로 위에 팝업이 표시됨
+- Windows 다크/라이트 모드 자동 감지
+- OS 표시 언어에 따라 한국어/영어 자동 전환
+- 단일 exe, 별도 설치 불필요
+- GUI 설정 에디터로 앱 추가/삭제/정렬 가능
 
 
 ## Installation
-**Requirements**
-- Windows 10 or later (64-bit)
+**요구 사항**
+- Windows 10 ~ (64비트)
 
-**How to Use**
-1. Download the latest version from [Releases](https://github.com/Oh-JongJin/Groupa/releases)
-2. Extract to any folder
-3. Move `Groupa.exe` to the taskbar
-4. Click on the taskbar to use
+**사용 방법**
+1. [Releases](https://github.com/Oh-JongJin/Groupa/releases) 페이지에서 최신 버전 다운로드
+2. 원하는 폴더에 압축 해제
+3. `Groupa.exe` 파일을 작업 표시줄로 이동
+4. 작업 표시줄에서 클릭하여 사용
 
 ## Build from Source
 ```bash
@@ -50,10 +50,10 @@ cd Groupa
 dotnet publish -c Release -r win-x64
 ```
 
-Output: `bin/Release/net8.0-windows/win-x64/publish/Groupa.exe`
+출력 경로: `bin/Release/net8.0-windows/win-x64/publish/Groupa.exe`
 
 ## Configuration
-Apps are stored in `config.json` (auto-generated on first run):
+앱 목록은 `config.json`에 저장됩니다 (첫 실행 시 자동 생성):
 
 ```json
 {
@@ -66,15 +66,15 @@ Apps are stored in `config.json` (auto-generated on first run):
 }
 ```
 
-- `name` — Leave empty for auto-detection (follows OS language), or set a custom name
-- `path` — Full path or filename (searches PATH automatically)
+- `name` — 비워두면 OS 언어에 맞게 자동 감지, 직접 입력하면 커스텀 이름 사용
+- `path` — 전체 경로 또는 파일명 (PATH 자동 검색)
 
 ## Tech Stack
 - .NET 8.0 / WPF
-- Windows 11 Fluent Design (Mica backdrop, rounded corners)
-- Shell32 `SHGetFileInfoW` for icon extraction
-- UI Automation API for taskbar detection
-- DWM `DwmSetWindowAttribute` for theme switching
+- Windows 11 Fluent Design (Mica 배경, 둥근 모서리)
+- Shell32 `SHGetFileInfoW` 아이콘 추출
+- UI Automation API 작업 표시줄 감지
+- DWM `DwmSetWindowAttribute` 테마 전환
 
 ## License
 MIT License
