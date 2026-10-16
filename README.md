@@ -29,7 +29,7 @@ Pin it to your taskbar — click to pop up a list of your favorite apps, just li
 - Popup appears right above the taskbar icon
 - Automatically follows Windows dark/light mode
 - Auto-detects OS display language (English / 한국어)
-- Single exe (~1MB), no installation required
+- Single exe, no installation required
 - Built-in settings editor to add, remove, and reorder apps
 
 
