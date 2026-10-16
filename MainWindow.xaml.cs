@@ -58,7 +58,7 @@ public partial class MainWindow : Window
     private AppConfig? _config;
     private int _selectedGroupIndex;
     private List<GroupTabItem>? _groupTabs;
-
+    private bool _initialHeightLocked;
     public MainWindow()
     {
         InitializeComponent();
@@ -236,6 +236,14 @@ public partial class MainWindow : Window
         Left = left;
         Top = top;
 
+        // Lock the height to the first group's rendered size, then switch to Width-only auto sizing
+        if (!_initialHeightLocked)
+        {
+            Height = ActualHeight;
+            SizeToContent = SizeToContent.Width;
+            _initialHeightLocked = true;
+        }
+
         // Store the fixed bottom anchor = top + height (this never changes)
         _bottomAnchorY = top + ActualHeight;
         _iconCenterX = left + (ActualWidth / 2.0);
@@ -293,6 +301,9 @@ public partial class MainWindow : Window
 
         var editor = new ConfigEditorWindow(_configPath);
         editor.ShowDialog();
+
+        if (!App.HotkeyMode)
+            Application.Current.Shutdown();
     }
 
     private void Preferences_Click(object sender, RoutedEventArgs e)
@@ -302,6 +313,9 @@ public partial class MainWindow : Window
 
         var prefs = new PreferencesWindow();
         prefs.ShowDialog();
+
+        if (!App.HotkeyMode)
+            Application.Current.Shutdown();
     }
 
     private void DeleteItem_Click(object sender, RoutedEventArgs e)
@@ -312,6 +326,15 @@ public partial class MainWindow : Window
             {
                 _displayItems?.Remove(item);
                 SaveConfigOrder();
+
+                // If on first group, recalculate the locked height
+                if (_selectedGroupIndex == 0 && _initialHeightLocked)
+                {
+                    SizeToContent = SizeToContent.WidthAndHeight;
+                    UpdateLayout();
+                    Height = ActualHeight;
+                    SizeToContent = SizeToContent.Width;
+                }
             }
             catch { }
         }

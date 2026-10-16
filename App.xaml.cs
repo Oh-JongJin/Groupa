@@ -56,6 +56,7 @@ public partial class App : Application
         if (e.Args.Length > 0 && e.Args[0] == "--clear-cache")
         {
             ClearJumpListCache();
+            RegisterJumpList();
             System.Windows.MessageBox.Show(
                 Strings.IsKorean ? "캐시가 초기화되었습니다." : "Cache cleared.",
                 "Groupa", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -265,10 +266,17 @@ public partial class App : Application
             Description = Strings.IsKorean ? "우클릭 메뉴 캐시 초기화" : "Clear right-click menu cache",
             ApplicationPath = exePath,
             Arguments = "--clear-cache",
+            IconResourcePath = Path.Combine(Environment.SystemDirectory, "shell32.dll"),
+            IconResourceIndex = 238,
             CustomCategory = ""
         });
 
         JumpList.SetJumpList(this, jumpList);
+        try
+        {
+            jumpList.Apply();
+        }
+        catch { }
     }
 
     private void ClearJumpListCache()

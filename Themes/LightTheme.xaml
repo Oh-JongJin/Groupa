@@ -9,6 +9,11 @@
     <SolidColorBrush x:Key="SeparatorBrush" Color="#12000000" />
     <SolidColorBrush x:Key="FooterItemForeground" Color="#DD000000" />
 
+    <!-- Tab selection brushes -->
+    <SolidColorBrush x:Key="TabSelectedBackground" Color="#20000000" />
+    <SolidColorBrush x:Key="TabSelectedBorder" Color="#30000000" />
+    <SolidColorBrush x:Key="TabSelectedForeground" Color="#FF000000" />
+
     <!-- Hover animation colors for light mode -->
     <Color x:Key="HoverColor">#0A000000</Color>
     <Color x:Key="TransparentColor">#00000000</Color>

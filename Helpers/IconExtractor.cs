@@ -41,15 +41,25 @@ public static class IconExtractor
         if (string.IsNullOrWhiteSpace(path))
             return null;
 
-        // For URLs — use shell32.dll globe icon
+        // For URLs — use the default browser's icon
         if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         {
             try
             {
+                var browserPath = GetDefaultBrowserPath();
+                if (!string.IsNullOrEmpty(browserPath) && File.Exists(browserPath))
+                {
+                    return ExtractIcon(browserPath);
+                }
+            }
+            catch { }
+
+            // Fallback: generic .url internet shortcut icon
+            try
+            {
                 var shinfo = new SHFILEINFO();
-                // Use a .url extension to get the default internet shortcut icon
                 SHGetFileInfoW(".url", 0x80, ref shinfo, (uint)Marshal.SizeOf(shinfo),
-                    SHGFI_ICON | SHGFI_SMALLICON | 0x10 /* SHGFI_USEFILEATTRIBUTES */);
+                    SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
                 if (shinfo.hIcon != IntPtr.Zero)
                 {
                     var icon = System.Drawing.Icon.FromHandle(shinfo.hIcon);
@@ -174,5 +184,44 @@ public static class IconExtractor
 
         // 3. Final fallback: filename without extension
         return Path.GetFileNameWithoutExtension(path) ?? path;
+    }
+    /// <summary>
+    /// Gets the default browser executable path from Windows registry.
+    /// </summary>
+    private static string? GetDefaultBrowserPath()
+    {
+        try
+        {
+            // Get the ProgId for http protocol
+            using var userChoice = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice");
+            var progId = userChoice?.GetValue("ProgId") as string;
+            if (string.IsNullOrEmpty(progId)) return null;
+
+            // Get the command for that ProgId
+            using var commandKey = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(
+                $@"{progId}\shell\open\command");
+            var command = commandKey?.GetValue(null) as string;
+            if (string.IsNullOrEmpty(command)) return null;
+
+            // Extract exe path from command string (e.g. "C:\...\chrome.exe" --args)
+            string exePath;
+            if (command.StartsWith("\""))
+            {
+                var endQuote = command.IndexOf('"', 1);
+                exePath = endQuote > 1 ? command.Substring(1, endQuote - 1) : command;
+            }
+            else
+            {
+                var spaceIdx = command.IndexOf(' ');
+                exePath = spaceIdx > 0 ? command.Substring(0, spaceIdx) : command;
+            }
+
+            return File.Exists(exePath) ? exePath : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

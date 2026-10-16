@@ -146,4 +146,14 @@ public partial class PreferencesWindow : Window
         DialogResult = false;
         Close();
     }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == Key.Escape)
+        {
+            DialogResult = false;
+            Close();
+        }
+    }
 }

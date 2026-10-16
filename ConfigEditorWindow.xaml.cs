@@ -49,6 +49,7 @@ public partial class ConfigEditorWindow : Window
         BtnDeleteGroup.Content = Strings.Get("DeleteGroup");
         BtnAddFolder.Content = Strings.Get("AddFolder");
         BtnAddUrl.Content = Strings.Get("AddUrl");
+        BtnRename.Content = Strings.Get("Rename");
         LblGroup.Text = Strings.Get("GroupLabel");
 
         AppListBox.ItemsSource = _items;
@@ -243,6 +244,27 @@ public partial class ConfigEditorWindow : Window
             HorizontalAlignment = System.Windows.HorizontalAlignment.Right
         };
         btnOk.Click += (s, ev) => { inputWindow.DialogResult = true; inputWindow.Close(); };
+        textBox.KeyDown += (s, ev) =>
+        {
+            if (ev.Key == System.Windows.Input.Key.Enter)
+            {
+                inputWindow.DialogResult = true;
+                inputWindow.Close();
+            }
+            else if (ev.Key == System.Windows.Input.Key.Escape)
+            {
+                inputWindow.DialogResult = false;
+                inputWindow.Close();
+            }
+        };
+        inputWindow.KeyDown += (s, ev) =>
+        {
+            if (ev.Key == System.Windows.Input.Key.Escape)
+            {
+                inputWindow.DialogResult = false;
+                inputWindow.Close();
+            }
+        };
 
         panel.Children.Add(label);
         panel.Children.Add(textBox);
@@ -257,6 +279,95 @@ public partial class ConfigEditorWindow : Window
                 Name = url,
                 Path = url
             });
+        }
+    }
+
+    private void RenameApp_Click(object sender, RoutedEventArgs e)
+    {
+        if (AppListBox.SelectedItem is AppEditItem item)
+            ShowRenameDialog(item);
+    }
+
+    private void AppListBox_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (AppListBox.SelectedItem is AppEditItem item)
+            ShowRenameDialog(item);
+    }
+
+    private void ShowRenameDialog(AppEditItem item)
+    {
+        var currentName = string.IsNullOrWhiteSpace(item.Name)
+            ? IconExtractor.GetDisplayName(item.Path)
+            : item.Name;
+
+        var inputWindow = new Window
+        {
+            Title = Strings.Get("RenameTitle"),
+            Width = 420, Height = 190,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            ResizeMode = ResizeMode.NoResize,
+            Background = (System.Windows.Media.Brush)FindResource("EditorWindowBg")
+        };
+
+        var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(16) };
+        var label = new System.Windows.Controls.TextBlock
+        {
+            Text = Strings.Get("RenamePrompt"),
+            Foreground = (System.Windows.Media.Brush)FindResource("HeaderForeground"),
+            FontSize = 13, Margin = new Thickness(0, 0, 0, 8)
+        };
+        var textBox = new System.Windows.Controls.TextBox
+        {
+            FontSize = 13, Padding = new Thickness(6, 4, 6, 4),
+            Text = currentName
+        };
+        textBox.SelectAll();
+        var btnOk = new System.Windows.Controls.Button
+        {
+            Content = "OK", Width = 80, Height = 30,
+            Margin = new Thickness(0, 12, 0, 0),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right
+        };
+        btnOk.Click += (s, ev) => { inputWindow.DialogResult = true; inputWindow.Close(); };
+        textBox.KeyDown += (s, ev) =>
+        {
+            if (ev.Key == System.Windows.Input.Key.Enter)
+            {
+                inputWindow.DialogResult = true;
+                inputWindow.Close();
+            }
+            else if (ev.Key == System.Windows.Input.Key.Escape)
+            {
+                inputWindow.DialogResult = false;
+                inputWindow.Close();
+            }
+        };
+        inputWindow.KeyDown += (s, ev) =>
+        {
+            if (ev.Key == System.Windows.Input.Key.Escape)
+            {
+                inputWindow.DialogResult = false;
+                inputWindow.Close();
+            }
+        };
+
+        panel.Children.Add(label);
+        panel.Children.Add(textBox);
+        panel.Children.Add(btnOk);
+        inputWindow.Content = panel;
+
+        if (inputWindow.ShowDialog() == true)
+        {
+            var newName = textBox.Text.Trim();
+            item.Name = newName;
+            // Refresh list display
+            var idx = _items.IndexOf(item);
+            if (idx >= 0)
+            {
+                _items.RemoveAt(idx);
+                _items.Insert(idx, item);
+                AppListBox.SelectedIndex = idx;
+            }
         }
     }
 
@@ -315,5 +426,12 @@ public partial class ConfigEditorWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Key == System.Windows.Input.Key.Escape)
+            Close();
     }
 }

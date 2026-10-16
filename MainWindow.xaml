@@ -21,9 +21,18 @@
             BorderBrush="{DynamicResource PopupBorder}" 
             BorderThickness="1" 
             Padding="4,4,4,8">
-        <StackPanel>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>  <!-- Row 0: Tab bar -->
+                <RowDefinition Height="Auto"/>  <!-- Row 1: Header text -->
+                <RowDefinition Height="Auto"/>  <!-- Row 2: Separator -->
+                <RowDefinition Height="*"/>     <!-- Row 3: App list (fills remaining) -->
+                <RowDefinition Height="Auto"/>  <!-- Row 4: Separator -->
+                <RowDefinition Height="Auto"/>  <!-- Row 5: Footer buttons -->
+            </Grid.RowDefinitions>
+
             <!-- Group Tab Bar (hidden when only 1 group) -->
-            <ItemsControl x:Name="GroupTabs" Margin="8,8,8,0">
+            <ItemsControl x:Name="GroupTabs" Grid.Row="0" Margin="8,8,8,0">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <WrapPanel Orientation="Horizontal"/>
@@ -35,23 +44,26 @@
                                 Cursor="Hand" 
                                 Background="Transparent"
                                 MouseLeftButtonDown="GroupTab_Click">
-                            <TextBlock Text="{Binding GroupName}" FontSize="12" FontFamily="Segoe UI"
+                            <TextBlock x:Name="TabText" Text="{Binding GroupName}" FontSize="12" FontFamily="Segoe UI"
                                        Foreground="{DynamicResource HeaderForeground}"/>
                         </Border>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource ItemHoverBackground}"/>
-                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource PopupBorder}"/>
-                                <Setter TargetName="TabBorder" Property="BorderThickness" Value="0,0,0,2"/>
+                                <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource TabSelectedBackground}"/>
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource TabSelectedBorder}"/>
+                                <Setter TargetName="TabBorder" Property="BorderThickness" Value="1"/>
+                                <Setter TargetName="TabText" Property="Foreground" Value="{DynamicResource TabSelectedForeground}"/>
+                                <Setter TargetName="TabText" Property="FontWeight" Value="SemiBold"/>
                             </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <TextBlock x:Name="HeaderText" Style="{DynamicResource HeaderText}" />
-            <Rectangle Style="{DynamicResource MenuSeparator}" />
+
+            <TextBlock x:Name="HeaderText" Grid.Row="1" Style="{DynamicResource HeaderText}" />
+            <Rectangle Grid.Row="2" Style="{DynamicResource MenuSeparator}" />
             
-            <Grid>
+            <Grid Grid.Row="3">
                 <ListBox x:Name="AppList" 
                          Background="Transparent" BorderThickness="0"
                          AllowDrop="True"
@@ -61,7 +73,7 @@
                          DragLeave="AppList_DragLeave"
                          Drop="AppList_Drop"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Background" Value="Transparent"/>
@@ -134,13 +146,13 @@
                            Visibility="Collapsed"/>
             </Grid>
             
-            <Rectangle Style="{DynamicResource MenuSeparator}" />
+            <Rectangle Grid.Row="4" Style="{DynamicResource MenuSeparator}" />
             
-            <StackPanel>
+            <StackPanel Grid.Row="5">
                 <Button x:Name="BtnSettings" Style="{DynamicResource FooterButton}" Click="Settings_Click" />
                 <Button x:Name="BtnPreferences" Style="{DynamicResource FooterButton}" Click="Preferences_Click" />
                 <Button x:Name="BtnClose" Style="{DynamicResource FooterButton}" Click="Close_Click" />
             </StackPanel>
-        </StackPanel>
+        </Grid>
     </Border>
 </Window>

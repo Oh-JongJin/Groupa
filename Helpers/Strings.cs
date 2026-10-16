@@ -43,6 +43,9 @@ public static class Strings
         ["GroupLabel"]     = "그룹",
         ["ConfirmDeleteGroup"] = "그룹 '{0}'을(를) 삭제하시겠습니까?",
         ["Confirm"]        = "확인",
+        ["RenameTitle"]    = "이름 변경",
+        ["RenamePrompt"]   = "표시할 이름을 입력하세요 (비우면 자동)",
+        ["Rename"]         = "✏️ 이름 변경",
     };
 
     private static readonly Dictionary<string, string> En = new()
@@ -83,6 +86,9 @@ public static class Strings
         ["GroupLabel"]     = "Group",
         ["ConfirmDeleteGroup"] = "Delete group '{0}'?",
         ["Confirm"]        = "Confirm",
+        ["RenameTitle"]    = "Rename",
+        ["RenamePrompt"]   = "Enter display name (leave empty for auto)",
+        ["Rename"]         = "✏️ Rename",
     };
 
     private static Dictionary<string, string>? _current;
