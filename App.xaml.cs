@@ -164,7 +164,7 @@ public partial class App : Application
                 {
                     if (_showEvent.WaitOne())
                     {
-                        Dispatcher.BeginInvoke(ShowPopup);
+                        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, (Action)ShowPopup);
                     }
                 }
                 catch

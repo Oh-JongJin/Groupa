@@ -17,6 +17,7 @@
     <!-- PERF: Pre-compile to native code -->
     <PublishReadyToRun>true</PublishReadyToRun>
     <ApplicationIcon>groupa.ico</ApplicationIcon>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
   </PropertyGroup>
 
   <ItemGroup>
