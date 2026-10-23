@@ -17,37 +17,69 @@ public static class HotkeyHelper
     public const uint MOD_WIN = 0x0008;
     public const uint MOD_NOREPEAT = 0x4000;
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
     private static IntPtr _hwnd;
     private static HwndSource? _source;
     private static Action? _callback;
 
-    public static bool Register(System.Windows.Window hiddenWindow, string modifiers, string key, Action onHotkey)
+    /// <summary>
+    /// Register a global hotkey using a lightweight pure HwndSource (no WPF Window needed).
+    /// </summary>
+    public static bool Register(string modifiers, string key, Action onHotkey)
     {
+        Unregister();
+
         _callback = onHotkey;
-        var helper = new WindowInteropHelper(hiddenWindow);
-        helper.EnsureHandle();
-        _hwnd = helper.Handle;
 
-        _source = HwndSource.FromHwnd(_hwnd);
-        _source?.AddHook(WndProc);
+        try
+        {
+            var parameters = new HwndSourceParameters("Groupa_HotkeyListener")
+            {
+                Width = 0,
+                Height = 0,
+                WindowStyle = 0x800000 // Basic non-visible window style
+            };
+            _source = new HwndSource(parameters);
+            _hwnd = _source.Handle;
+            _source.AddHook(WndProc);
 
-        uint mod = ParseModifiers(modifiers) | MOD_NOREPEAT;
-        uint vk = ParseKey(key);
+            uint mod = ParseModifiers(modifiers);
+            uint vk = ParseKey(key);
 
-        return RegisterHotKey(_hwnd, HOTKEY_ID, mod, vk);
+            // Try with MOD_NOREPEAT first
+            bool success = RegisterHotKey(_hwnd, HOTKEY_ID, mod | MOD_NOREPEAT, vk);
+            if (!success)
+            {
+                // Fallback without MOD_NOREPEAT for environments that don't support it
+                success = RegisterHotKey(_hwnd, HOTKEY_ID, mod, vk);
+            }
+
+            return success;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static void Unregister()
     {
-        _source?.RemoveHook(WndProc);
+        if (_source != null)
+        {
+            try { _source.RemoveHook(WndProc); } catch { }
+            try { _source.Dispose(); } catch { }
+            _source = null;
+        }
         if (_hwnd != IntPtr.Zero)
-            UnregisterHotKey(_hwnd, HOTKEY_ID);
+        {
+            try { UnregisterHotKey(_hwnd, HOTKEY_ID); } catch { }
+            _hwnd = IntPtr.Zero;
+        }
     }
 
     private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)

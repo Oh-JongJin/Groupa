@@ -18,7 +18,7 @@ public partial class App : Application
     private Mutex? _mutex;
     private EventWaitHandle? _showEvent;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
-    private Window? _hiddenWindow;
+    private MainWindow? _activePopup;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -28,6 +28,44 @@ public partial class App : Application
         IsDarkMode = PreferencesHelper.ResolveDarkMode(prefs);
         HotkeyMode = prefs.HotkeyEnabled;
 
+        // Single instance check (only when hotkey mode is on)
+        const string mutexName = "Groupa_SingleInstance_Mutex";
+        const string eventName = "Groupa_Show_Event";
+
+        if (HotkeyMode)
+        {
+            bool isNew = false;
+            try
+            {
+                _mutex = new Mutex(true, mutexName, out isNew);
+            }
+            catch (AbandonedMutexException)
+            {
+                isNew = true;
+            }
+
+            if (!isNew)
+            {
+                try
+                {
+                    using var evt = EventWaitHandle.OpenExisting(eventName);
+                    evt.Set();
+                }
+                catch { }
+                Shutdown();
+                return;
+            }
+
+            try
+            {
+                _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
+            }
+            catch
+            {
+                try { _showEvent = EventWaitHandle.OpenExisting(eventName); } catch { }
+            }
+        }
+
         // Load theme
         var themeUri = IsDarkMode
             ? new Uri("Themes/DarkTheme.xaml", UriKind.Relative)
@@ -36,7 +74,7 @@ public partial class App : Application
 
         base.OnStartup(e);
 
-        // Handle --settings / --preferences arguments (before mutex check)
+        // Handle --settings / --preferences arguments
         if (e.Args.Length > 0)
         {
             if (e.Args[0] == "--settings")
@@ -51,71 +89,34 @@ public partial class App : Application
                 Shutdown();
                 return;
             }
-        }
-        // Handle --clear-cache before anything else
-        if (e.Args.Length > 0 && e.Args[0] == "--clear-cache")
-        {
-            ClearJumpListCache();
-            RegisterJumpList();
-            System.Windows.MessageBox.Show(
-                Strings.IsKorean ? "캐시가 초기화되었습니다." : "Cache cleared.",
-                "Groupa", MessageBoxButton.OK, MessageBoxImage.Information);
-            Shutdown();
-            return;
-        }
-
-        // Single instance check (only when hotkey mode is on)
-        const string mutexName = "Groupa_SingleInstance_Mutex";
-        const string eventName = "Groupa_Show_Event";
-
-        if (HotkeyMode)
-        {
-            _mutex = new Mutex(true, mutexName, out bool isNew);
-            if (!isNew)
+            else if (e.Args[0] == "--clear-cache")
             {
-                try
-                {
-                    var evt = EventWaitHandle.OpenExisting(eventName);
-                    evt.Set();
-                }
-                catch { }
+                ClearJumpListCache();
+                IconExtractor.ClearCache();
+                RegisterJumpList();
+                System.Windows.MessageBox.Show(
+                    Strings.IsKorean ? "캐시가 초기화되었습니다." : "Cache cleared.",
+                    "Groupa", MessageBoxButton.OK, MessageBoxImage.Information);
                 Shutdown();
                 return;
             }
-            _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
         }
 
         // Pre-search taskbar button
         Task.Run(() => WindowPositioner.PreFindTaskbarButton());
 
-        // Register Jump List with cache clear option
-        RegisterJumpList();
+        // Register Jump List asynchronously in background so popup opens instantly
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(() =>
+        {
+            RegisterJumpList();
+        }));
 
         if (HotkeyMode)
         {
-            // === Background mode: tray icon + hotkey ===
-            _hiddenWindow = new Window
-            {
-                Width = 0, Height = 0,
-                WindowStyle = WindowStyle.None,
-                ShowInTaskbar = false,
-                ShowActivated = false,
-                Visibility = Visibility.Hidden
-            };
-            _hiddenWindow.Show();
-            _hiddenWindow.Hide();
-
-            HotkeyHelper.Register(_hiddenWindow, prefs.HotkeyModifiers, prefs.HotkeyKey, ShowPopup);
+            // Setup tray icon and hotkey
             SetupTrayIcon(prefs);
-
-            // Listen for signal from other instances
-            Task.Run(() =>
-            {
-                while (_showEvent != null && _showEvent.WaitOne())
-                {
-                    Dispatcher.BeginInvoke(ShowPopup);
-                }
-            });
+            SetupHotkey(prefs);
+            StartEventListener();
         }
 
         // Show popup on first launch
@@ -124,21 +125,55 @@ public partial class App : Application
 
     public void ShowPopup()
     {
-        // If popup is already open, just activate it
+        // If popup is already open, toggle it closed
         if (_activePopup != null && _activePopup.IsLoaded)
         {
-            _activePopup.Activate();
+            _activePopup.SafeClose();
             return;
         }
 
-        Task.Run(() => WindowPositioner.PreFindTaskbarButton());
+        WindowPositioner.UpdateCursorPosition();
         var mainWindow = new MainWindow();
         _activePopup = mainWindow;
         mainWindow.Closed += (s, e) => _activePopup = null;
         mainWindow.Show();
+        mainWindow.Activate();
     }
 
-    private MainWindow? _activePopup;
+    private void SetupHotkey(Models.Preferences prefs)
+    {
+        bool ok = HotkeyHelper.Register(prefs.HotkeyModifiers, prefs.HotkeyKey, () => Dispatcher.BeginInvoke(ShowPopup));
+        if (!ok && _trayIcon != null)
+        {
+            var hotkeyText = HotkeyHelper.FormatHotkey(prefs.HotkeyModifiers, prefs.HotkeyKey);
+            _trayIcon.ShowBalloonTip(3000, "Groupa",
+                Strings.IsKorean
+                    ? $"단축키({hotkeyText}) 등록에 실패했습니다. 다른 프로그램과 중복될 수 있습니다."
+                    : $"Failed to register hotkey ({hotkeyText}). It may be in conflict with another app.",
+                System.Windows.Forms.ToolTipIcon.Warning);
+        }
+    }
+
+    private void StartEventListener()
+    {
+        Task.Run(() =>
+        {
+            while (_showEvent != null)
+            {
+                try
+                {
+                    if (_showEvent.WaitOne())
+                    {
+                        Dispatcher.BeginInvoke(ShowPopup);
+                    }
+                }
+                catch
+                {
+                    break;
+                }
+            }
+        });
+    }
 
     /// <summary>
     /// Dynamically apply hotkey preference changes without restart.
@@ -153,43 +188,32 @@ public partial class App : Application
 
         if (HotkeyMode)
         {
-            // Ensure hidden window exists
-            if (_hiddenWindow == null)
+            if (_trayIcon == null)
             {
-                _hiddenWindow = new Window
-                {
-                    Width = 0, Height = 0,
-                    WindowStyle = WindowStyle.None,
-                    ShowInTaskbar = false,
-                    ShowActivated = false,
-                    Visibility = Visibility.Hidden
-                };
-                _hiddenWindow.Show();
-                _hiddenWindow.Hide();
+                SetupTrayIcon(prefs);
+            }
+            else
+            {
+                var hotkeyText = HotkeyHelper.FormatHotkey(prefs.HotkeyModifiers, prefs.HotkeyKey);
+                var tip = $"Groupa ({hotkeyText})";
+                if (tip.Length > 63) tip = tip.Substring(0, 63);
+                _trayIcon.Text = tip;
             }
 
-            HotkeyHelper.Register(_hiddenWindow, prefs.HotkeyModifiers, prefs.HotkeyKey, ShowPopup);
-
-            // Setup tray if not exists
-            if (_trayIcon == null)
-                SetupTrayIcon(prefs);
-            else
-                _trayIcon.Text = $"Groupa ({HotkeyHelper.FormatHotkey(prefs.HotkeyModifiers, prefs.HotkeyKey)})";
+            SetupHotkey(prefs);
 
             // Setup single instance mutex if not exists
             if (_mutex == null)
             {
                 const string mutexName = "Groupa_SingleInstance_Mutex";
                 const string eventName = "Groupa_Show_Event";
-                _mutex = new Mutex(true, mutexName, out _);
-                _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
-                Task.Run(() =>
+                try
                 {
-                    while (_showEvent != null && _showEvent.WaitOne())
-                    {
-                        Dispatcher.BeginInvoke(ShowPopup);
-                    }
-                });
+                    _mutex = new Mutex(true, mutexName, out _);
+                    _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
+                    StartEventListener();
+                }
+                catch { }
             }
         }
         else
@@ -197,6 +221,20 @@ public partial class App : Application
             // Disable: remove tray icon
             _trayIcon?.Dispose();
             _trayIcon = null;
+            _showEvent?.Dispose();
+            _showEvent = null;
+            if (_mutex != null)
+            {
+                try { _mutex.ReleaseMutex(); } catch { }
+                _mutex.Dispose();
+                _mutex = null;
+            }
+
+            // If no window is visible, shut down cleanly
+            if (_activePopup == null || !_activePopup.IsLoaded)
+            {
+                Shutdown();
+            }
         }
     }
 
@@ -216,7 +254,9 @@ public partial class App : Application
         }
 
         var hotkeyText = HotkeyHelper.FormatHotkey(prefs.HotkeyModifiers, prefs.HotkeyKey);
-        _trayIcon.Text = $"Groupa ({hotkeyText})";
+        var tip = $"Groupa ({hotkeyText})";
+        if (tip.Length > 63) tip = tip.Substring(0, 63);
+        _trayIcon.Text = tip;
         _trayIcon.Visible = true;
 
         _trayIcon.MouseClick += (s, e) =>
@@ -248,8 +288,11 @@ public partial class App : Application
         HotkeyHelper.Unregister();
         _trayIcon?.Dispose();
         _showEvent?.Dispose();
-        _mutex?.ReleaseMutex();
-        _mutex?.Dispose();
+        if (_mutex != null)
+        {
+            try { _mutex.ReleaseMutex(); } catch { }
+            _mutex.Dispose();
+        }
         Shutdown();
     }
 
@@ -322,8 +365,14 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        HotkeyHelper.Unregister();
         _trayIcon?.Dispose();
         _showEvent?.Dispose();
+        if (_mutex != null)
+        {
+            try { _mutex.ReleaseMutex(); } catch { }
+            _mutex.Dispose();
+        }
         base.OnExit(e);
     }
 }

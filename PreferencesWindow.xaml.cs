@@ -134,11 +134,13 @@ public partial class PreferencesWindow : Window
 
         PreferencesHelper.Save(_prefs);
 
+        if (Application.Current is App app)
+        {
+            app.ReloadHotkey();
+        }
+
         DialogResult = true;
         Close();
-
-        // Shut down entire app so changes take effect on next launch
-        Application.Current.Shutdown();
     }
 
     private void BtnCancel_Click(object sender, RoutedEventArgs e)

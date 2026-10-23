@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -10,6 +11,9 @@ namespace JumpListLauncher.Helpers;
 
 public static class IconExtractor
 {
+    private static readonly ConcurrentDictionary<string, BitmapSource> _iconCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, string> _displayNameCache = new(StringComparer.OrdinalIgnoreCase);
+
     private const uint SHGFI_ICON = 0x100;
     private const uint SHGFI_SMALLICON = 0x1;
     private const uint SHGFI_LARGEICON = 0x0;
@@ -36,10 +40,31 @@ public static class IconExtractor
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyIcon(IntPtr hIcon);
 
+    public static BitmapSource? GetCachedIcon(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        return _iconCache.TryGetValue(path, out var bmp) ? bmp : null;
+    }
+
+    public static string? GetCachedDisplayName(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        return _displayNameCache.TryGetValue(path, out var name) ? name : null;
+    }
+
+    public static void ClearCache()
+    {
+        _iconCache.Clear();
+        _displayNameCache.Clear();
+    }
+
     public static BitmapSource? ExtractIcon(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
             return null;
+
+        if (_iconCache.TryGetValue(path, out var cached))
+            return cached;
 
         // For URLs — use the default browser's icon
         if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase))
@@ -49,7 +74,12 @@ public static class IconExtractor
                 var browserPath = GetDefaultBrowserPath();
                 if (!string.IsNullOrEmpty(browserPath) && File.Exists(browserPath))
                 {
-                    return ExtractIcon(browserPath);
+                    var browserIcon = ExtractIcon(browserPath);
+                    if (browserIcon != null)
+                    {
+                        _iconCache[path] = browserIcon;
+                        return browserIcon;
+                    }
                 }
             }
             catch { }
@@ -68,6 +98,8 @@ public static class IconExtractor
                         new Int32Rect(0, 0, icon.Width, icon.Height),
                         BitmapSizeOptions.FromEmptyOptions());
                     DestroyIcon(shinfo.hIcon);
+                    bmp.Freeze();
+                    _iconCache[path] = bmp;
                     return bmp;
                 }
             }
@@ -110,6 +142,8 @@ public static class IconExtractor
                 BitmapSizeOptions.FromEmptyOptions());
 
             DestroyIcon(shinfo.hIcon);
+            bitmapSource.Freeze();
+            _iconCache[path] = bitmapSource;
             return bitmapSource;
         }
         catch
@@ -146,6 +180,9 @@ public static class IconExtractor
         if (string.IsNullOrWhiteSpace(path))
             return Path.GetFileNameWithoutExtension(path) ?? path;
 
+        if (_displayNameCache.TryGetValue(path, out var cachedName))
+            return cachedName;
+
         // Try resolving short paths
         string resolvedPath = path;
         if (!File.Exists(path) && !Path.IsPathRooted(path))
@@ -161,7 +198,10 @@ public static class IconExtractor
             {
                 var versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(resolvedPath);
                 if (!string.IsNullOrWhiteSpace(versionInfo.FileDescription))
+                {
+                    _displayNameCache[path] = versionInfo.FileDescription;
                     return versionInfo.FileDescription;
+                }
             }
         }
         catch { }
@@ -178,12 +218,17 @@ public static class IconExtractor
                 (uint)Marshal.SizeOf(shinfo), flags);
 
             if (res != IntPtr.Zero && !string.IsNullOrWhiteSpace(shinfo.szDisplayName))
+            {
+                _displayNameCache[path] = shinfo.szDisplayName;
                 return shinfo.szDisplayName;
+            }
         }
         catch { }
 
         // 3. Final fallback: filename without extension
-        return Path.GetFileNameWithoutExtension(path) ?? path;
+        var fallback = Path.GetFileNameWithoutExtension(path) ?? path;
+        _displayNameCache[path] = fallback;
+        return fallback;
     }
     /// <summary>
     /// Gets the default browser executable path from Windows registry.

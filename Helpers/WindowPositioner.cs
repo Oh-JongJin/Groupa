@@ -61,6 +61,14 @@ public static class WindowPositioner
     private static POINT _startupCursorPos;
 
     /// <summary>
+    /// Update cursor position right before showing the popup.
+    /// </summary>
+    public static void UpdateCursorPosition()
+    {
+        GetCursorPos(out _startupCursorPos);
+    }
+
+    /// <summary>
     /// Pre-search the taskbar button position. Call this as early as possible (App.OnStartup).
     /// Also captures cursor position before WPF window appears.
     /// </summary>
@@ -72,6 +80,11 @@ public static class WindowPositioner
 
     public static (double Left, double Top) CalculatePosition(Window window)
     {
+        if (_startupCursorPos.x == 0 && _startupCursorPos.y == 0)
+        {
+            GetCursorPos(out _startupCursorPos);
+        }
+
         var presentationSource = PresentationSource.FromVisual(window);
         double dpiX = 1.0, dpiY = 1.0;
         if (presentationSource?.CompositionTarget != null)

@@ -19,8 +19,14 @@ namespace JumpListLauncher;
 
 public class AppDisplayItem : INotifyPropertyChanged
 {
-    public string Name { get; set; } = "";
+    private string _name = "";
+    public string Name
+    {
+        get => _name;
+        set { _name = value; OnPropertyChanged(); }
+    }
     public string Path { get; set; } = "";
+    public bool HasCustomName { get; set; }
 
     private BitmapSource? _icon;
     public BitmapSource? Icon
@@ -59,6 +65,8 @@ public partial class MainWindow : Window
     private int _selectedGroupIndex;
     private List<GroupTabItem>? _groupTabs;
     private bool _initialHeightLocked;
+    private bool _isClosing;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -74,6 +82,11 @@ public partial class MainWindow : Window
 
         Loaded += MainWindow_Loaded;
         Deactivated += MainWindow_Deactivated;
+        Closing += (s, e) =>
+        {
+            _isClosing = true;
+            Deactivated -= MainWindow_Deactivated;
+        };
         SizeChanged += MainWindow_SizeChanged;
     }
 
@@ -169,15 +182,20 @@ public partial class MainWindow : Window
         _displayItems = new ObservableCollection<AppDisplayItem>();
         foreach (var app in group.Apps)
         {
-            var displayName = string.IsNullOrWhiteSpace(app.Name)
-                ? IconExtractor.GetDisplayName(app.Path)
-                : app.Name;
+            bool hasCustom = !string.IsNullOrWhiteSpace(app.Name);
+            var cachedName = hasCustom ? app.Name : IconExtractor.GetCachedDisplayName(app.Path);
+            var fastName = !string.IsNullOrEmpty(cachedName)
+                ? cachedName
+                : (hasCustom ? app.Name : (System.IO.Path.GetFileNameWithoutExtension(app.Path) is { Length: > 0 } fn ? fn : app.Path));
+
+            var cachedIcon = IconExtractor.GetCachedIcon(app.Path);
 
             _displayItems.Add(new AppDisplayItem
             {
-                Name = displayName,
+                Name = fastName,
                 Path = app.Path,
-                Icon = null
+                HasCustomName = hasCustom,
+                Icon = cachedIcon
             });
         }
 
@@ -196,25 +214,37 @@ public partial class MainWindow : Window
         if (sender is FrameworkElement element && element.DataContext is GroupTabItem tab)
         {
             LoadGroup(tab.Index);
-
-            // Load icons for new group
-            if (_displayItems != null)
-            {
-                Task.Run(() =>
-                {
-                    foreach (var item in _displayItems.ToList())
-                    {
-                        try
-                        {
-                            var bmp = IconExtractor.ExtractIcon(item.Path);
-                            bmp?.Freeze();
-                            Dispatcher.BeginInvoke(() => item.Icon = bmp);
-                        }
-                        catch { }
-                    }
-                });
-            }
+            StartBackgroundDetailsLoading();
         }
+    }
+
+    private void StartBackgroundDetailsLoading()
+    {
+        if (_displayItems == null) return;
+        var itemsSnapshot = _displayItems.ToList();
+        Task.Run(() =>
+        {
+            foreach (var item in itemsSnapshot)
+            {
+                try
+                {
+                    // Resolve localized display name in background (0ms UI thread impact)
+                    if (!item.HasCustomName)
+                    {
+                        var realName = IconExtractor.GetDisplayName(item.Path);
+                        if (!string.IsNullOrWhiteSpace(realName) && realName != item.Name)
+                        {
+                            Dispatcher.BeginInvoke(() => item.Name = realName);
+                        }
+                    }
+
+                    var bmp = IconExtractor.ExtractIcon(item.Path);
+                    bmp?.Freeze();
+                    Dispatcher.BeginInvoke(() => item.Icon = bmp);
+                }
+                catch { }
+            }
+        });
     }
 
     private void SaveConfig(AppConfig config)
@@ -227,7 +257,7 @@ public partial class MainWindow : Window
         File.WriteAllText(_configPath, JsonSerializer.Serialize(config, options));
     }
 
-    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         DwmHelper.EnableMica(this);
         UpdateLayout();
@@ -251,30 +281,32 @@ public partial class MainWindow : Window
 
         Activate();
 
-        // Load icons on background thread (SHGetFileInfoW is COM-based, single-thread only)
-        if (_displayItems != null)
+        // Load details and icons asynchronously in background
+        StartBackgroundDetailsLoading();
+    }
+
+    public void SafeClose()
+    {
+        if (_isClosing) return;
+        _isClosing = true;
+
+        Deactivated -= MainWindow_Deactivated;
+
+        try
         {
-            await Task.Run(() =>
-            {
-                foreach (var item in _displayItems)
-                {
-                    try
-                    {
-                        var bmp = IconExtractor.ExtractIcon(item.Path);
-                        bmp?.Freeze();
-                        Dispatcher.BeginInvoke(() => item.Icon = bmp);
-                    }
-                    catch { }
-                }
-            });
+            Close();
+        }
+        catch { }
+
+        if (!App.HotkeyMode)
+        {
+            Application.Current.Shutdown();
         }
     }
 
     private void MainWindow_Deactivated(object? sender, EventArgs e)
     {
-        Close();
-        if (!App.HotkeyMode)
-            Application.Current.Shutdown();
+        SafeClose();
     }
 
     private void AppItem_Click(object sender, RoutedEventArgs e)
@@ -284,7 +316,7 @@ public partial class MainWindow : Window
             try
             {
                 Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
-                Close();
+                SafeClose();
             }
             catch (Exception ex)
             {
@@ -297,7 +329,8 @@ public partial class MainWindow : Window
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         Deactivated -= MainWindow_Deactivated;
-        Close();
+        _isClosing = true;
+        try { Close(); } catch { }
 
         var editor = new ConfigEditorWindow(_configPath);
         editor.ShowDialog();
@@ -309,10 +342,16 @@ public partial class MainWindow : Window
     private void Preferences_Click(object sender, RoutedEventArgs e)
     {
         Deactivated -= MainWindow_Deactivated;
-        Close();
+        _isClosing = true;
+        try { Close(); } catch { }
 
         var prefs = new PreferencesWindow();
         prefs.ShowDialog();
+
+        if (Application.Current is App app)
+        {
+            app.ReloadHotkey();
+        }
 
         if (!App.HotkeyMode)
             Application.Current.Shutdown();
@@ -508,7 +547,7 @@ public partial class MainWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e)
     {
-        Close();
+        SafeClose();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -516,7 +555,7 @@ public partial class MainWindow : Window
         base.OnKeyDown(e);
         if (e.Key == Key.Escape)
         {
-            Close();
+            SafeClose();
         }
     }
 }
