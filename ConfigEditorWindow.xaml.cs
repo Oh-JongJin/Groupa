@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using JumpListLauncher.Helpers;
 using JumpListLauncher.Models;
@@ -90,6 +91,7 @@ public partial class ConfigEditorWindow : Window
     {
         InitializeComponent();
         SourceInitialized += (_, _) => DwmHelper.ApplyTitleBarTheme(this);
+        HoverHelper.Attach(this);
         _configPath = configPath;
         _initialGroupIndex = initialGroupIndex;
 
@@ -100,20 +102,25 @@ public partial class ConfigEditorWindow : Window
         Title = Strings.Get("EditorTitle");
         LblGroupName.Text = Strings.Get("GroupName");
         LblAppList.Text = Strings.Get("AppList");
-        BtnAdd.Content = Strings.Get("AddApp");
-        BtnRemove.Content = Strings.Get("Remove");
-        BtnUp.Content = Strings.Get("MoveUp");
-        BtnDown.Content = Strings.Get("MoveDown");
+        TxtDropHint.Text = Strings.Get("DropHint");
+        BtnAdd.Content = IconContent("\uE710", Strings.Get("Add"), "\uE70D");
+        BtnRemove.Content = IconContent("\uE74D", Strings.Get("Remove"));
+        BtnRename.Content = IconContent("\uE8AC", Strings.Get("Rename"));
         BtnSave.Content = Strings.Get("Save");
         BtnCancel.Content = Strings.Get("Cancel");
-        BtnAddGroup.Content = Strings.Get("AddGroup");
-        BtnDeleteGroup.Content = Strings.Get("DeleteGroup");
-        BtnAddFolder.Content = Strings.Get("AddFolder");
-        BtnAddUrl.Content = Strings.Get("AddUrl");
-        BtnRename.Content = Strings.Get("Rename");
+        BtnAddGroup.Content = IconContent("\uE710", Strings.Get("AddGroup"));
+        BtnDeleteGroup.Content = IconContent("\uE74D", Strings.Get("DeleteGroup"));
+        MnuAddApp.Header = Strings.Get("AddMenuApp");
+        MnuAddFolder.Header = Strings.Get("AddMenuFolder");
+        MnuAddUrl.Header = Strings.Get("AddMenuUrl");
+        MnuRename.Header = Strings.Get("Rename");
+        MnuUp.Header = Strings.Get("MoveUp");
+        MnuDown.Header = Strings.Get("MoveDown");
+        MnuRemove.Header = Strings.Get("Remove");
         LblGroup.Text = Strings.Get("GroupLabel");
 
         AppListBox.ItemsSource = _items;
+        UpdateItemButtons();
 
         LoadConfig();
     }
@@ -143,8 +150,8 @@ public partial class ConfigEditorWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"{Strings.Get("ErrorLoad")}: {ex.Message}", Strings.Get("Error"),
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show($"{Strings.Get("ErrorLoad")}: {ex.Message}", Strings.Get("Error"),
+                MessageBoxButton.OK, MessageBoxImage.Error, this);
         }
     }
 
@@ -196,9 +203,10 @@ public partial class ConfigEditorWindow : Window
         LoadDetailsInBackground(_items.ToList());
     }
 
-    private void AddItem(AppEditItem item)
+    private void AddItem(AppEditItem item, int index = -1)
     {
-        _items.Add(item);
+        if (index < 0 || index > _items.Count) _items.Add(item);
+        else _items.Insert(index, item);
         AppListBox.SelectedItem = item;
         AppListBox.ScrollIntoView(item);
         LoadDetailsInBackground(new[] { item });
@@ -272,8 +280,8 @@ public partial class ConfigEditorWindow : Window
 
         var groupName = _config.Groups[_selectedGroupIndex].GroupName;
         var msg = string.Format(Strings.Get("ConfirmDeleteGroup"), groupName);
-        var result = MessageBox.Show(msg, Strings.Get("Confirm"),
-            MessageBoxButton.YesNo, MessageBoxImage.Question);
+        var result = ThemedDialog.Show(msg, Strings.Get("Confirm"),
+            MessageBoxButton.YesNo, MessageBoxImage.Question, this);
 
         if (result == MessageBoxResult.Yes)
         {
@@ -521,9 +529,15 @@ public partial class ConfigEditorWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"{Strings.Get("ErrorLoad")}: {ex.Message}", Strings.Get("Error"),
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialog.Show($"{Strings.Get("ErrorLoad")}: {ex.Message}", Strings.Get("Error"),
+                MessageBoxButton.OK, MessageBoxImage.Error, this);
         }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        EndDragSession();
+        base.OnClosed(e);
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
@@ -537,4 +551,206 @@ public partial class ConfigEditorWindow : Window
         if (e.Key == System.Windows.Input.Key.Escape)
             Close();
     }
+
+    // === Toolbar helpers ===
+
+    private static object IconContent(string glyph, string text, string? trailingGlyph = null)
+    {
+        var iconFont = new System.Windows.Media.FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets");
+        var panel = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+        panel.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = glyph, FontFamily = iconFont, FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 7, 0)
+        });
+        panel.Children.Add(new System.Windows.Controls.TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+        if (trailingGlyph != null)
+        {
+            panel.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = trailingGlyph, FontFamily = iconFont, FontSize = 9,
+                VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 2, 0, 0)
+            });
+        }
+        return panel;
+    }
+
+    private void AddMenu_Click(object sender, RoutedEventArgs e)
+    {
+        AddMenu.PlacementTarget = BtnAdd;
+        AddMenu.IsOpen = true;
+    }
+
+    private void UpdateItemButtons()
+    {
+        bool hasSelection = AppListBox.SelectedItem != null;
+        BtnRename.IsEnabled = hasSelection;
+        BtnRemove.IsEnabled = hasSelection;
+    }
+
+    private void AppListBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        => UpdateItemButtons();
+
+    private void AppListBox_ContextMenuOpening(object sender, System.Windows.Controls.ContextMenuEventArgs e)
+    {
+        // Mouse right-click targets the item under the mouse (no menu on empty space);
+        // the keyboard menu key (CursorLeft == -1) uses the current selection.
+        if (e.CursorLeft >= 0)
+        {
+            var item = ItemAt(Mouse.GetPosition(AppListBox));
+            if (item == null) { e.Handled = true; return; }
+            AppListBox.SelectedItem = item;
+        }
+        if (AppListBox.SelectedItem == null) { e.Handled = true; return; }
+
+        int index = AppListBox.SelectedIndex;
+        MnuUp.IsEnabled = index > 0;
+        MnuDown.IsEnabled = index < _items.Count - 1;
+    }
+
+    private void AppListBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (AppListBox.SelectedItem is not AppEditItem item) return;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        bool alt = Keyboard.Modifiers == ModifierKeys.Alt;
+
+        if (key == Key.Delete) { RemoveApp_Click(sender, e); e.Handled = true; }
+        else if (key == Key.F2) { ShowRenameDialog(item); e.Handled = true; }
+        else if (alt && key == Key.Up) { MoveUp_Click(sender, e); e.Handled = true; }
+        else if (alt && key == Key.Down) { MoveDown_Click(sender, e); e.Handled = true; }
+    }
+
+    // === Drag & drop: files from Explorer to add, items within the list to reorder ===
+
+    private const string ItemDragFormat = "Groupa.AppEditItem";
+    private Point _dragStart;
+    private AppEditItem? _dragCandidate;
+
+    private AppEditItem? ItemAt(Point pos)
+    {
+        var hit = AppListBox.InputHitTest(pos) as DependencyObject;
+        while (hit != null && hit is not System.Windows.Controls.ListBoxItem)
+            hit = System.Windows.Media.VisualTreeHelper.GetParent(hit);
+        return hit is System.Windows.Controls.ListBoxItem lbi
+            ? AppListBox.ItemContainerGenerator.ItemFromContainer(lbi) as AppEditItem
+            : null;
+    }
+
+    private void AppListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragStart = e.GetPosition(AppListBox);
+        _dragCandidate = ItemAt(_dragStart);
+    }
+
+    private void AppListBox_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_dragCandidate == null || e.LeftButton != MouseButtonState.Pressed) return;
+        var pos = e.GetPosition(AppListBox);
+        if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;
+
+        var item = _dragCandidate;
+        _dragCandidate = null;
+        AppListBox.SelectedItem = item;
+        DragDrop.DoDragDrop(AppListBox, new DataObject(ItemDragFormat, item), DragDropEffects.Move);
+        EndDragSession();
+    }
+
+    private void AppListBox_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(ItemDragFormat))
+        {
+            e.Effects = DragDropEffects.Move;
+            if (e.Data.GetData(ItemDragFormat) is AppEditItem dragged)
+            {
+                TouchDragSession(isFiles: false, dragged);
+                ReorderDraggedTo(e.GetPosition(AppListBox), dragged);
+            }
+        }
+        else if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+            TouchDragSession(isFiles: true, null);
+            ShowDropLine(DropIndexAt(e.GetPosition(AppListBox)));
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    /// <summary>Live reorder: move the dragged item to the slot under the cursor.</summary>
+    private void ReorderDraggedTo(Point pos, AppEditItem dragged)
+    {
+        if (ItemAt(pos) is not { } target || ReferenceEquals(dragged, target)) return;
+        int from = _items.IndexOf(dragged), to = _items.IndexOf(target);
+        if (from < 0 || to < 0) return;
+        _items.Move(from, to);
+        AppListBox.SelectedItem = dragged;
+    }
+
+    private void AppListBox_Drop(object sender, DragEventArgs e)
+    {
+        EndDragSession();
+        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) && e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] paths)
+        {
+            int index = DropIndexAt(e.GetPosition(AppListBox));
+            foreach (var path in paths)
+            {
+                if (string.IsNullOrWhiteSpace(path)) continue;
+                AddItem(new AppEditItem { Name = "", Path = path }, index++);
+            }
+            Activate();
+        }
+        e.Handled = true;
+    }
+
+    private void AppListBox_DragLeave(object sender, DragEventArgs e)
+    {
+        // Also fires when crossing between child elements, but DragEnter/DragOver right after re-show it.
+        // Checking the position here isn't reliable: a fast exit can still report a point inside.
+        HideDropLine();
+        LeaveDragSession();
+    }
+
+    /// <summary>Insertion index for a drop at <paramref name="pos"/>: before an item's upper half, after its lower half.</summary>
+    private int DropIndexAt(Point pos)
+    {
+        for (int i = 0; i < _items.Count; i++)
+        {
+            if (AppListBox.ItemContainerGenerator.ContainerFromIndex(i) is not System.Windows.Controls.ListBoxItem c
+                || !c.IsVisible) continue;
+            var top = c.TranslatePoint(new Point(0, 0), AppListBox).Y;
+            if (pos.Y < top + c.ActualHeight / 2) return i;
+        }
+        return _items.Count;
+    }
+
+    private void ShowDropLine(int index)
+    {
+        double y;
+        if (_items.Count == 0)
+        {
+            y = 4;
+        }
+        else if (index < _items.Count && AppListBox.ItemContainerGenerator.ContainerFromIndex(index) is System.Windows.Controls.ListBoxItem next)
+        {
+            y = next.TranslatePoint(new Point(0, 0), AppListBox).Y;
+        }
+        else if (AppListBox.ItemContainerGenerator.ContainerFromIndex(_items.Count - 1) is System.Windows.Controls.ListBoxItem last)
+        {
+            y = last.TranslatePoint(new Point(0, last.ActualHeight), AppListBox).Y;
+        }
+        else return;
+
+        y = Math.Clamp(y - 1, 1, Math.Max(1, AppListBox.ActualHeight - 3));
+        System.Windows.Controls.Canvas.SetLeft(DropLine, 6);
+        System.Windows.Controls.Canvas.SetTop(DropLine, y);
+        DropLine.Width = Math.Max(0, AppListBox.ActualWidth - 12);
+        DropLine.Visibility = Visibility.Visible;
+    }
+
+    private void HideDropLine() => DropLine.Visibility = Visibility.Collapsed;
 }

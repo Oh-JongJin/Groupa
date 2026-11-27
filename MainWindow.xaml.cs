@@ -82,6 +82,7 @@ public partial class MainWindow : Window
     {
         _suppressLoadErrors = prewarm;
         InitializeComponent();
+        HoverHelper.Attach(this);
         _configPath = AppPaths.ConfigPath;
 
         // Apply localized strings
@@ -182,7 +183,7 @@ public partial class MainWindow : Window
         {
             LoadFailed = true;
             if (_suppressLoadErrors) return;
-            MessageBox.Show($"{Strings.Get("ErrorLoad")}: {ex.Message}", Strings.Get("Error"),
+            ThemedDialog.Show($"{Strings.Get("ErrorLoad")}: {ex.Message}", Strings.Get("Error"),
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -407,7 +408,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"{Strings.Get("ErrorLaunch")}: {ex.Message}", Strings.Get("Error"),
+            ThemedDialog.Show($"{Strings.Get("ErrorLaunch")}: {ex.Message}", Strings.Get("Error"),
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
