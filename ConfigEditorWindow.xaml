@@ -74,7 +74,8 @@
                 <Button x:Name="BtnDeleteGroup" DockPanel.Dock="Right" Style="{StaticResource EditorButton}" Click="DeleteGroup_Click" Margin="8,0,0,0"/>
                 <Button x:Name="BtnAddGroup" DockPanel.Dock="Right" Style="{StaticResource EditorButton}" Click="AddGroup_Click" Margin="8,0,0,0"/>
                 <ComboBox x:Name="CmbGroup" FontSize="13" Height="30" VerticalContentAlignment="Center"
-                          SelectionChanged="CmbGroup_SelectionChanged"/>
+                          SelectionChanged="CmbGroup_SelectionChanged"
+                          PreviewMouseWheel="CmbGroup_PreviewMouseWheel"/>
             </DockPanel>
         </StackPanel>
 
@@ -87,13 +88,44 @@
         <TextBlock x:Name="LblAppList" Grid.Row="2" Foreground="{DynamicResource HeaderForeground}" FontFamily="Segoe UI" FontSize="12" Margin="0,0,0,6"/>
 
         <ListBox Grid.Row="3" x:Name="AppListBox" Style="{StaticResource EditorListBox}" 
-                 DisplayMemberPath="DisplayText" Margin="0,0,0,12"
+                 Margin="0,0,0,12"
                  SelectionMode="Single"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  MouseDoubleClick="AppListBox_MouseDoubleClick">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid ToolTip="{Binding Path}" ToolTipService.InitialShowDelay="600">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Image Grid.Column="0" Source="{Binding Icon}" Width="20" Height="20"
+                               Margin="0,0,10,0" VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding SecondaryText}" FontSize="11"
+                                       Foreground="{DynamicResource EditorSecondaryText}"
+                                       TextTrimming="CharacterEllipsis" Margin="0,1,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SecondaryText}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="Foreground" Value="{DynamicResource ItemForeground}"/>
-                    <Setter Property="Padding" Value="8,4"/>
+                    <Setter Property="Padding" Value="8,6"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                     <Style.Triggers>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter Property="Background" Value="{DynamicResource EditorSelectedBg}"/>

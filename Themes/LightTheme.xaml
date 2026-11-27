@@ -27,6 +27,7 @@
     <SolidColorBrush x:Key="EditorInputBg" Color="#FFFFFF" />
     <SolidColorBrush x:Key="EditorBorderColor" Color="#CCCCCC" />
     <SolidColorBrush x:Key="EditorSelectedBg" Color="#D0E8FF" />
+    <SolidColorBrush x:Key="EditorSecondaryText" Color="#8A000000" />
 
     <Style x:Key="MenuItemButton" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
