@@ -466,7 +466,11 @@ public partial class ConfigEditorWindow : Window
 
         if (inputWindow.ShowDialog() == true)
         {
-            item.Name = textBox.Text.Trim();
+            var newName = textBox.Text.Trim();
+            // Unchanged → keep as is, so an automatic name isn't frozen into a custom one.
+            // Empty → back to the automatic name.
+            if (newName != currentName)
+                item.Name = newName;
         }
     }
 

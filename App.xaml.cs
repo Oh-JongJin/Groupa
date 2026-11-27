@@ -56,6 +56,7 @@ public partial class App : Application
         }
 
         LoadThemeResources();
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 
         base.OnStartup(e);
 
@@ -266,6 +267,35 @@ public partial class App : Application
 
         ReloadHotkey();
         SchedulePrewarm();
+    }
+
+    /// <summary>
+    /// Windows light/dark switch while running (matters in background mode, where the process stays up).
+    /// Only acts when the theme preference is "system" and the effective theme actually changed.
+    /// </summary>
+    private void OnUserPreferenceChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+    {
+        // The light/dark switch arrives as WM_SETTINGCHANGE "ImmersiveColorSet" → General
+        if (e.Category is not (Microsoft.Win32.UserPreferenceCategory.General
+            or Microsoft.Win32.UserPreferenceCategory.Color
+            or Microsoft.Win32.UserPreferenceCategory.VisualStyle)) return;
+        Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                var prefs = PreferencesHelper.Load();
+                if (prefs.Theme != "system") return;
+                var dark = PreferencesHelper.ResolveDarkMode(prefs);
+                if (dark == IsDarkMode) return;
+
+                IsDarkMode = dark;
+                LoadThemeResources();
+                DiscardWindow(_prewarmed);
+                _prewarmed = null;
+                SchedulePrewarm();
+            }
+            catch { }
+        });
     }
 
     private void SetupHotkey(Models.Preferences prefs)
@@ -588,6 +618,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         HotkeyHelper.Unregister();
         _trayIcon?.Dispose();
         DisposeSignalEvents();

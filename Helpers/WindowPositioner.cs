@@ -89,6 +89,7 @@ public static class WindowPositioner
         var pt = _startupCursorPos;
 
         var taskbarHwnd = GetTaskbarUnderPoint(pt);
+        _openedFromTaskbar = taskbarHwnd != IntPtr.Zero;
         if (taskbarHwnd != IntPtr.Zero)
         {
             // Launched by clicking a taskbar/tray button: the button under the cursor is the anchor.
@@ -218,8 +219,33 @@ public static class WindowPositioner
         double winWidth = double.IsNaN(window.Width) ? window.ActualWidth : window.Width;
         double winHeight = double.IsNaN(window.Height) ? window.ActualHeight : window.Height;
 
-        // Get the monitor where cursor is located
-        var hMonitor = MonitorFromPoint(_startupCursorPos, MONITOR_DEFAULTTONEAREST);
+        // "At mouse cursor" preference (not for taskbar/tray clicks, which always anchor to the button)
+        if (!_openedFromTaskbar && PreferencesHelper.Load().PopupPosition == "cursor")
+            return CalculateCursorPosition(winWidth, winHeight, dpiX, dpiY);
+
+        // Anchor: our taskbar button wherever it is (with several monitors the taskbar may be on another
+        // one than the cursor, e.g. hotkey pressed on a monitor without a taskbar). Without a known
+        // button, use the cursor's monitor if it has a taskbar, else the main taskbar's monitor.
+        var buttonRect = CachedButtonRect;
+        POINT anchor = _startupCursorPos;
+        bool centerOnWorkArea = false;
+        if (buttonRect.HasValue)
+        {
+            anchor = new POINT
+            {
+                x = (int)(buttonRect.Value.X + buttonRect.Value.Width / 2.0),
+                y = (int)(buttonRect.Value.Y + buttonRect.Value.Height / 2.0)
+            };
+        }
+        else if (!MonitorHasTaskbar(MonitorFromPoint(_startupCursorPos, MONITOR_DEFAULTTONEAREST))
+                 && GetMainTaskbarRect() is { } tb)
+        {
+            anchor = new POINT { x = (tb.left + tb.right) / 2, y = (tb.top + tb.bottom) / 2 };
+            centerOnWorkArea = true;
+        }
+
+        var hMonitor = MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST);
+        _anchorMonitor = hMonitor;
         var monInfo = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
         GetMonitorInfo(hMonitor, ref monInfo);
 
@@ -261,20 +287,13 @@ public static class WindowPositioner
             taskbarSize = monRight - workRight;
         }
 
-        // Use cached button rect if it's on this monitor
-        var buttonRect = CachedButtonRect;
         double iconCenterX;
-
-        if (buttonRect.HasValue &&
-            buttonRect.Value.X / dpiX >= monLeft && buttonRect.Value.X / dpiX <= monRight)
-        {
+        if (buttonRect.HasValue)
             iconCenterX = (buttonRect.Value.X + buttonRect.Value.Width / 2.0) / dpiX;
-        }
+        else if (centerOnWorkArea)
+            iconCenterX = workLeft + workWidth / 2.0;
         else
-        {
-            // Fallback: use cursor X position
-            iconCenterX = _startupCursorPos.x / dpiX;
-        }
+            iconCenterX = _startupCursorPos.x / dpiX; // cursor's monitor has a taskbar: cursor X
 
         double left = iconCenterX - (winWidth / 2.0);
         double top;
@@ -317,8 +336,13 @@ public static class WindowPositioner
     /// </summary>
     public static System.Windows.Rect GetCurrentMonitorWorkArea()
     {
-        GetCursorPos(out var pt);
-        var hMonitor = MonitorFromPoint(pt.x != 0 || pt.y != 0 ? pt : _startupCursorPos, MONITOR_DEFAULTTONEAREST);
+        // The monitor the popup was placed on (may differ from the cursor's)
+        var hMonitor = _anchorMonitor;
+        if (hMonitor == IntPtr.Zero)
+        {
+            GetCursorPos(out var pt);
+            hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        }
         var monInfo = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
         GetMonitorInfo(hMonitor, ref monInfo);
 
@@ -327,6 +351,49 @@ public static class WindowPositioner
             monInfo.rcWork.left, monInfo.rcWork.top,
             monInfo.rcWork.right - monInfo.rcWork.left,
             monInfo.rcWork.bottom - monInfo.rcWork.top);
+    }
+
+    private static IntPtr _anchorMonitor;
+    private static bool _openedFromTaskbar;
+
+    /// <summary>Popup centered on the cursor, just above it (below if there's no room), on the cursor's monitor.</summary>
+    private static (double Left, double Top) CalculateCursorPosition(double winWidth, double winHeight, double dpiX, double dpiY)
+    {
+        var hMonitor = MonitorFromPoint(_startupCursorPos, MONITOR_DEFAULTTONEAREST);
+        _anchorMonitor = hMonitor;
+        var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+        GetMonitorInfo(hMonitor, ref mi);
+
+        double workLeft = mi.rcWork.left / dpiX, workTop = mi.rcWork.top / dpiY;
+        double workRight = mi.rcWork.right / dpiX, workBottom = mi.rcWork.bottom / dpiY;
+        double cx = _startupCursorPos.x / dpiX, cy = _startupCursorPos.y / dpiY;
+
+        double left = cx - winWidth / 2.0;
+        double top = cy - winHeight - 8;
+        if (top < workTop + 8) top = cy + 8;
+
+        if (left < workLeft + 8) left = workLeft + 8;
+        if (left + winWidth > workRight - 8) left = workRight - winWidth - 8;
+        if (top + winHeight > workBottom - 8) top = workBottom - winHeight - 8;
+        if (top < workTop + 8) top = workTop + 8;
+        return (left, top);
+    }
+
+    /// <summary>True if the monitor's work area is smaller than the monitor, i.e. a taskbar is docked on it.</summary>
+    private static bool MonitorHasTaskbar(IntPtr hMonitor)
+    {
+        var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+        if (!GetMonitorInfo(hMonitor, ref mi)) return true;
+        return mi.rcWork.left != mi.rcMonitor.left || mi.rcWork.top != mi.rcMonitor.top ||
+               mi.rcWork.right != mi.rcMonitor.right || mi.rcWork.bottom != mi.rcMonitor.bottom;
+    }
+
+    /// <summary>Screen rect of the main taskbar (Shell_TrayWnd), in physical pixels.</summary>
+    private static RECT? GetMainTaskbarRect()
+    {
+        var abd = new APPBARDATA { cbSize = Marshal.SizeOf(typeof(APPBARDATA)) };
+        if (SHAppBarMessage(ABM_GETTASKBARPOS, ref abd) == IntPtr.Zero) return null;
+        return abd.rc;
     }
 
     private static System.Windows.Rect? FindTaskbarButtonRect()

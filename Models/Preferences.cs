@@ -33,4 +33,11 @@ public class Preferences
     /// </summary>
     [JsonPropertyName("hotkey_key")]
     public string HotkeyKey { get; set; } = "G";
+
+    /// <summary>
+    /// Where the popup opens when not opened from the taskbar (hotkey etc.):
+    /// "taskbar" = above Groupa's taskbar button, "cursor" = at the mouse cursor.
+    /// </summary>
+    [JsonPropertyName("popup_position")]
+    public string PopupPosition { get; set; } = "taskbar";
 }

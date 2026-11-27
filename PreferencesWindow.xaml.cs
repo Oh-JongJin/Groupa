@@ -31,6 +31,7 @@ public partial class PreferencesWindow : Window
         LblTheme.Text = Strings.Get("ThemeLabel");
         LblLanguage.Text = Strings.Get("LanguageLabel");
         LblHotkey.Text = Strings.Get("HotkeyLabel");
+        LblPopupPosition.Text = Strings.Get("PopupPositionLabel");
         BtnSave.Content = Strings.Get("Save");
         BtnCancel.Content = Strings.Get("Cancel");
         ChkHotkeyEnabled.Content = Strings.Get("HotkeyEnabled");
@@ -64,6 +65,14 @@ public partial class PreferencesWindow : Window
             "en" => 2,
             _ => 0
         };
+
+        // Popup position (hotkey)
+        CmbPopupPosition.ItemsSource = new[]
+        {
+            new ComboItem(Strings.Get("PopupPositionTaskbar"), "taskbar"),
+            new ComboItem(Strings.Get("PopupPositionCursor"), "cursor"),
+        };
+        CmbPopupPosition.SelectedIndex = _prefs.PopupPosition == "cursor" ? 1 : 0;
 
         // Hotkey
         ChkHotkeyEnabled.IsChecked = _prefs.HotkeyEnabled;
@@ -127,6 +136,9 @@ public partial class PreferencesWindow : Window
             _prefs.Theme = theme.Value;
         if (CmbLanguage.SelectedItem is ComboItem lang)
             _prefs.Language = lang.Value;
+
+        if (CmbPopupPosition.SelectedItem is ComboItem pos)
+            _prefs.PopupPosition = pos.Value;
 
         _prefs.HotkeyEnabled = ChkHotkeyEnabled.IsChecked == true;
         _prefs.HotkeyModifiers = _hotkeyModifiers;

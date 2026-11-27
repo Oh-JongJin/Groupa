@@ -45,8 +45,9 @@
                   Foreground="{DynamicResource ItemForeground}"
                   Checked="ChkHotkeyEnabled_Changed" Unchecked="ChkHotkeyEnabled_Changed"/>
 
-        <!-- Hotkey Input -->
-        <Grid x:Name="HotkeyPanel" Margin="0,0,0,14">
+        <!-- Hotkey options (shown only when the hotkey is enabled) -->
+        <StackPanel x:Name="HotkeyPanel">
+        <Grid Margin="0,0,0,14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="16"/>
@@ -63,6 +64,21 @@
                      Cursor="Hand" PreviewKeyDown="TxtHotkey_PreviewKeyDown"
                      GotFocus="TxtHotkey_GotFocus" LostFocus="TxtHotkey_LostFocus"/>
         </Grid>
+
+        <!-- Popup position when opened by the hotkey -->
+        <Grid Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" x:Name="LblPopupPosition" Text="Popup position"
+                       VerticalAlignment="Center" FontSize="14"
+                       Foreground="{DynamicResource ItemForeground}"/>
+            <ComboBox Grid.Column="2" x:Name="CmbPopupPosition"
+                      Height="30" FontSize="13" VerticalContentAlignment="Center"/>
+        </Grid>
+        </StackPanel>
 
         <!-- Buttons -->
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
