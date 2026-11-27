@@ -46,6 +46,9 @@ public static class Strings
         ["RenameTitle"]    = "이름 변경",
         ["RenamePrompt"]   = "표시할 이름을 입력하세요 (비우면 자동)",
         ["Rename"]         = "✏️ 이름 변경",
+        ["EmptyGroup"]     = "이 그룹에 등록된 앱이 없습니다.",
+        ["ItemRemoved"]    = "'{0}' 삭제됨",
+        ["Undo"]           = "실행 취소",
     };
 
     private static readonly Dictionary<string, string> En = new()
@@ -89,6 +92,9 @@ public static class Strings
         ["RenameTitle"]    = "Rename",
         ["RenamePrompt"]   = "Enter display name (leave empty for auto)",
         ["Rename"]         = "✏️ Rename",
+        ["EmptyGroup"]     = "No apps in this group yet.",
+        ["ItemRemoved"]    = "Removed '{0}'",
+        ["Undo"]           = "Undo",
     };
 
     private static Dictionary<string, string>? _current;

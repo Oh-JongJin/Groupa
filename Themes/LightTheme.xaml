@@ -6,6 +6,7 @@
     <SolidColorBrush x:Key="HeaderForeground" Color="#DD000000" />
     <SolidColorBrush x:Key="ItemForeground" Color="#DD000000" />
     <SolidColorBrush x:Key="ItemHoverBackground" Color="#0A000000" />
+    <SolidColorBrush x:Key="ItemFocusBackground" Color="#14000000" />
     <SolidColorBrush x:Key="SeparatorBrush" Color="#12000000" />
     <SolidColorBrush x:Key="FooterItemForeground" Color="#DD000000" />
 
@@ -33,9 +34,13 @@
         <Setter Property="Foreground" Value="{StaticResource ItemForeground}" />
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="FontSize" Value="14" />
+        <!-- Keyboard focus is shown by FocusFill below instead of the classic dotted rectangle -->
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
+                    <Grid>
+                    <Border x:Name="FocusFill" CornerRadius="4" Background="{StaticResource ItemFocusBackground}" Visibility="Collapsed" />
                     <Border x:Name="ItemBorder" CornerRadius="4" Padding="12,8">
                         <Border.Background>
                             <SolidColorBrush Color="{StaticResource TransparentColor}" />
@@ -46,7 +51,11 @@
                             <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="FocusFill" Property="Visibility" Value="Visible" />
+                        </Trigger>
                         <EventTrigger RoutedEvent="MouseEnter">
                             <BeginStoryboard>
                                 <Storyboard>

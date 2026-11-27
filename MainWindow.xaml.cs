@@ -91,6 +91,9 @@ public partial class MainWindow : Window
         LoadConfigFast();
 
         BtnPreferences.Content = Strings.Get("Preferences");
+        EmptyText.Text = Strings.Get("EmptyGroup");
+        BtnEmptyAdd.Content = Strings.Get("AddApp");
+        BtnUndo.Content = Strings.Get("Undo");
 
         Loaded += MainWindow_Loaded;
         Deactivated += MainWindow_Deactivated;
@@ -214,6 +217,8 @@ public partial class MainWindow : Window
         }
 
         AppList.ItemsSource = _displayItems;
+        UpdateEmptyState();
+        HideUndo(); // an undo only applies to the group it was made in
 
         // Update tab selection
         if (_groupTabs != null)
@@ -391,71 +396,278 @@ public partial class MainWindow : Window
     private void AppItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement element && element.DataContext is AppDisplayItem item)
+            LaunchItem(item);
+    }
+
+    private void LaunchItem(AppDisplayItem item)
+    {
+        try
         {
-            try
-            {
-                Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
-                SafeClose();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"{Strings.Get("ErrorLaunch")}: {ex.Message}", Strings.Get("Error"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
+            SafeClose();
         }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"{Strings.Get("ErrorLaunch")}: {ex.Message}", Strings.Get("Error"),
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>Close the popup (without the deactivation side effects) before opening a dialog.</summary>
+    private void CloseForDialog()
+    {
+        Deactivated -= MainWindow_Deactivated;
+        _isClosing = true;
+        try { Close(); } catch { }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        Deactivated -= MainWindow_Deactivated;
-        _isClosing = true;
-        try { Close(); } catch { }
-
-        var editor = new ConfigEditorWindow(_configPath);
-        editor.ShowDialog();
-
-        if (!App.HotkeyMode)
-            Application.Current.Shutdown();
+        CloseForDialog();
+        (Application.Current as App)?.OpenSettingsDialog(_selectedGroupIndex);
     }
 
     private void Preferences_Click(object sender, RoutedEventArgs e)
     {
-        Deactivated -= MainWindow_Deactivated;
-        _isClosing = true;
-        try { Close(); } catch { }
-
-        var prefs = new PreferencesWindow();
-        prefs.ShowDialog();
-
-        if (Application.Current is App app)
-        {
-            app.ReloadHotkey();
-        }
-
-        if (!App.HotkeyMode)
-            Application.Current.Shutdown();
+        CloseForDialog();
+        (Application.Current as App)?.OpenPreferencesDialog();
     }
+
+    // === Empty group ===
+
+    private void UpdateEmptyState()
+    {
+        bool empty = _displayItems == null || _displayItems.Count == 0;
+        EmptyState.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void EmptyAdd_Click(object sender, RoutedEventArgs e)
+    {
+        // Open the editor on the group being viewed so apps can be added right away
+        CloseForDialog();
+        (Application.Current as App)?.OpenSettingsDialog(_selectedGroupIndex);
+    }
+
+    // === Quick delete (✕) with undo ===
+
+    private sealed record PendingUndo(AppDisplayItem Item, AppEntry Entry, int Index, int GroupIndex);
+
+    private PendingUndo? _pendingUndo;
+    private System.Windows.Threading.DispatcherTimer? _undoTimer;
 
     private void DeleteItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement element && element.DataContext is AppDisplayItem item)
-        {
-            try
-            {
-                _displayItems?.Remove(item);
-                SaveConfigOrder();
+            DeleteItem(item);
+    }
 
-                // If on first group, recalculate the locked height
-                if (_selectedGroupIndex == 0 && _initialHeightLocked)
-                {
-                    SizeToContent = SizeToContent.WidthAndHeight;
-                    UpdateLayout();
-                    Height = ActualHeight;
-                    SizeToContent = SizeToContent.Width;
-                }
-            }
-            catch { }
+    private void DeleteItem(AppDisplayItem item)
+    {
+        if (_displayItems == null || _config == null) return;
+        if (_selectedGroupIndex < 0 || _selectedGroupIndex >= _config.Groups.Count) return;
+
+        try
+        {
+            int index = _displayItems.IndexOf(item);
+            if (index < 0) return;
+
+            // Keep the original entry (custom name etc.) so undo restores it exactly
+            var group = _config.Groups[_selectedGroupIndex];
+            var entry = group.Apps.FirstOrDefault(a => a.Path == item.Path)
+                        ?? new AppEntry { Name = "", Path = item.Path };
+
+            _displayItems.Remove(item);
+            SaveConfigOrder();
+            RelockFirstGroupHeight();
+            UpdateEmptyState();
+
+            ShowUndo(new PendingUndo(item, entry, index, _selectedGroupIndex));
         }
+        catch { }
+    }
+
+    private void ShowUndo(PendingUndo undo)
+    {
+        _pendingUndo = undo;
+        UndoText.Text = string.Format(Strings.Get("ItemRemoved"), undo.Item.Name);
+        UndoBar.Visibility = Visibility.Visible;
+
+        _undoTimer ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+        _undoTimer.Tick -= UndoTimer_Tick;
+        _undoTimer.Tick += UndoTimer_Tick;
+        _undoTimer.Stop();
+        _undoTimer.Start();
+    }
+
+    private void UndoTimer_Tick(object? sender, EventArgs e) => HideUndo();
+
+    private void HideUndo()
+    {
+        _undoTimer?.Stop();
+        _pendingUndo = null;
+        UndoBar.Visibility = Visibility.Collapsed;
+    }
+
+    private void Undo_Click(object sender, RoutedEventArgs e) => UndoDelete();
+
+    private void UndoDelete()
+    {
+        var undo = _pendingUndo;
+        HideUndo();
+        if (undo == null || _displayItems == null || _config == null) return;
+        if (undo.GroupIndex != _selectedGroupIndex || undo.GroupIndex >= _config.Groups.Count) return;
+
+        try
+        {
+            var group = _config.Groups[undo.GroupIndex];
+            group.Apps.Insert(Math.Min(undo.Index, group.Apps.Count), undo.Entry);
+            _displayItems.Insert(Math.Min(undo.Index, _displayItems.Count), undo.Item);
+            SaveConfig(_config);
+            RelockFirstGroupHeight();
+            UpdateEmptyState();
+        }
+        catch { }
+    }
+
+    /// <summary>The popup height is locked to the first group's content; re-measure it after it changes.</summary>
+    private void RelockFirstGroupHeight()
+    {
+        if (_selectedGroupIndex != 0 || !_initialHeightLocked) return;
+
+        SizeToContent = SizeToContent.WidthAndHeight;
+        UpdateLayout();
+        Height = ActualHeight;
+        SizeToContent = SizeToContent.Width;
+    }
+
+    // === Keyboard navigation ===
+    // ↑/↓ move between apps, Enter launches, 1–9 launch directly, ←/→ or Ctrl+(Shift+)Tab switch groups,
+    // Ctrl+Z undoes a quick delete, Esc closes.
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+        if (e.Handled) return;
+
+        var mods = Keyboard.Modifiers;
+        var key = e.Key;
+
+        if (mods == ModifierKeys.Control && key == Key.Z)
+        {
+            UndoDelete();
+            e.Handled = true;
+            return;
+        }
+
+        if (key == Key.Tab && mods.HasFlag(ModifierKeys.Control))
+        {
+            SwitchGroup(mods.HasFlag(ModifierKeys.Shift) ? -1 : +1);
+            e.Handled = true;
+            return;
+        }
+
+        if (mods != ModifierKeys.None) return;
+
+        switch (key)
+        {
+            case Key.Down:
+                MoveItemFocus(+1);
+                e.Handled = true;
+                return;
+            case Key.Up:
+                MoveItemFocus(-1);
+                e.Handled = true;
+                return;
+            case Key.Left:
+                SwitchGroup(-1);
+                e.Handled = true;
+                return;
+            case Key.Right:
+                SwitchGroup(+1);
+                e.Handled = true;
+                return;
+            case Key.Enter:
+                var focused = FocusedItemIndex();
+                if (focused >= 0 && _displayItems != null)
+                {
+                    LaunchItem(_displayItems[focused]);
+                    e.Handled = true;
+                }
+                return;
+        }
+
+        int number = key switch
+        {
+            >= Key.D1 and <= Key.D9 => key - Key.D1,
+            >= Key.NumPad1 and <= Key.NumPad9 => key - Key.NumPad1,
+            _ => -1
+        };
+        if (number >= 0 && _displayItems != null && number < _displayItems.Count)
+        {
+            LaunchItem(_displayItems[number]);
+            e.Handled = true;
+        }
+    }
+
+    private int FocusedItemIndex()
+    {
+        if (_displayItems == null) return -1;
+        if (Keyboard.FocusedElement is FrameworkElement fe && fe.DataContext is AppDisplayItem item)
+            return _displayItems.IndexOf(item);
+        return -1;
+    }
+
+    private void MoveItemFocus(int delta)
+    {
+        if (_displayItems == null || _displayItems.Count == 0) return;
+
+        int current = FocusedItemIndex();
+        int next = current < 0
+            ? (delta > 0 ? 0 : _displayItems.Count - 1)
+            : (current + delta + _displayItems.Count) % _displayItems.Count;
+        FocusItem(next);
+    }
+
+    private void FocusItem(int index)
+    {
+        if (_displayItems == null || index < 0 || index >= _displayItems.Count) return;
+
+        AppList.ScrollIntoView(_displayItems[index]);
+        var container = AppList.ItemContainerGenerator.ContainerFromIndex(index) as ListBoxItem;
+        if (container == null)
+        {
+            AppList.UpdateLayout();
+            container = AppList.ItemContainerGenerator.ContainerFromIndex(index) as ListBoxItem;
+        }
+        if (container == null) return;
+
+        // The first Button in the item template is the launch button (the ✕ button comes after it)
+        var button = FindDescendant<Button>(container);
+        button?.Focus();
+    }
+
+    private void SwitchGroup(int delta)
+    {
+        if (_config == null || _config.Groups.Count <= 1) return;
+
+        int count = _config.Groups.Count;
+        LoadGroup((_selectedGroupIndex + delta + count) % count);
+        StartBackgroundDetailsLoading();
+
+        // Keep keyboard flow going: focus the first app of the new group once it's laid out
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () => FocusItem(0));
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T found) return found;
+            var deeper = FindDescendant<T>(child);
+            if (deeper != null) return deeper;
+        }
+        return null;
     }
 
     // === Drag & Drop Reorder ===

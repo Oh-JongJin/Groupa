@@ -27,10 +27,14 @@ public partial class ConfigEditorWindow : Window
 
     public bool WasSaved { get; private set; }
 
-    public ConfigEditorWindow(string configPath)
+    private readonly int _initialGroupIndex;
+
+    /// <param name="initialGroupIndex">Group to select when the editor opens (e.g. the popup's current tab).</param>
+    public ConfigEditorWindow(string configPath, int initialGroupIndex = 0)
     {
         InitializeComponent();
         _configPath = configPath;
+        _initialGroupIndex = initialGroupIndex;
 
         // Apply theme background
         Background = (System.Windows.Media.Brush)FindResource("EditorWindowBg");
@@ -77,7 +81,7 @@ public partial class ConfigEditorWindow : Window
             RefreshGroupCombo();
             if (_config.Groups.Count > 0)
             {
-                CmbGroup.SelectedIndex = 0;
+                CmbGroup.SelectedIndex = Math.Clamp(_initialGroupIndex, 0, _config.Groups.Count - 1);
             }
         }
         catch (Exception ex)

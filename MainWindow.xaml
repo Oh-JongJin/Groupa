@@ -64,8 +64,9 @@
             <Rectangle Grid.Row="2" Style="{DynamicResource MenuSeparator}" />
             
             <Grid Grid.Row="3">
-                <ListBox x:Name="AppList" 
+                <ListBox x:Name="AppList"
                          Background="Transparent" BorderThickness="0"
+                         Focusable="False"
                          AllowDrop="True"
                          PreviewMouseLeftButtonDown="AppList_PreviewMouseDown"
                          PreviewMouseMove="AppList_PreviewMouseMove"
@@ -80,6 +81,8 @@
                             <Setter Property="BorderThickness" Value="0"/>
                             <Setter Property="Padding" Value="0"/>
                             <Setter Property="Margin" Value="0"/>
+                            <!-- Keyboard focus goes to the item button itself (arrow-key navigation) -->
+                            <Setter Property="Focusable" Value="False"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                             <Setter Property="Template">
                                 <Setter.Value>
@@ -107,6 +110,7 @@
                                         Width="24" Height="24"
                                         Cursor="Hand"
                                         Opacity="0"
+                                        Focusable="False"
                                         Click="DeleteItem_Click"
                                         Foreground="{DynamicResource HeaderForeground}"
                                         Background="Transparent"
@@ -136,23 +140,54 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
                 <!-- Drop indicator line -->
-                <Rectangle x:Name="DropIndicator" 
-                           Height="2" 
-                           Fill="{DynamicResource PopupBorder}" 
+                <Rectangle x:Name="DropIndicator"
+                           Height="2"
+                           Fill="{DynamicResource PopupBorder}"
                            HorizontalAlignment="Stretch"
                            VerticalAlignment="Top"
                            Margin="12,0,12,0"
                            IsHitTestVisible="False"
                            Visibility="Collapsed"/>
+
+                <!-- Empty group guidance -->
+                <StackPanel x:Name="EmptyState"
+                            VerticalAlignment="Center" HorizontalAlignment="Center"
+                            Margin="16,24" Visibility="Collapsed">
+                    <TextBlock x:Name="EmptyText"
+                               FontFamily="Segoe UI" FontSize="13"
+                               Foreground="{DynamicResource HeaderForeground}"
+                               TextAlignment="Center" TextWrapping="Wrap"/>
+                    <Button x:Name="BtnEmptyAdd" Style="{DynamicResource FooterButton}"
+                            HorizontalAlignment="Center" Margin="0,8,0,0"
+                            Click="EmptyAdd_Click"/>
+                </StackPanel>
             </Grid>
-            
+
             <Rectangle Grid.Row="4" Style="{DynamicResource MenuSeparator}" />
-            
+
             <StackPanel Grid.Row="5">
                 <Button x:Name="BtnSettings" Style="{DynamicResource FooterButton}" Click="Settings_Click" />
                 <Button x:Name="BtnPreferences" Style="{DynamicResource FooterButton}" Click="Preferences_Click" />
                 <Button x:Name="BtnClose" Style="{DynamicResource FooterButton}" Click="Close_Click" />
             </StackPanel>
+
+            <!-- Undo bar after quick-delete (✕). Overlays the footer so the app list layout never shifts. -->
+            <Border x:Name="UndoBar" Grid.Row="4" Grid.RowSpan="2"
+                    VerticalAlignment="Bottom" Margin="8,0,8,0"
+                    CornerRadius="6" Padding="12,2,2,2"
+                    Background="{DynamicResource EditorButtonBg}"
+                    BorderBrush="{DynamicResource PopupBorder}" BorderThickness="1"
+                    Visibility="Collapsed">
+                <DockPanel>
+                    <Button x:Name="BtnUndo" DockPanel.Dock="Right"
+                            Style="{DynamicResource FooterButton}" FontWeight="SemiBold"
+                            Click="Undo_Click"/>
+                    <TextBlock x:Name="UndoText" VerticalAlignment="Center"
+                               FontFamily="Segoe UI" FontSize="13"
+                               Foreground="{DynamicResource ItemForeground}"
+                               TextTrimming="CharacterEllipsis"/>
+                </DockPanel>
+            </Border>
         </Grid>
     </Border>
 </Window>

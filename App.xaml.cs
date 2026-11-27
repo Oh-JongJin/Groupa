@@ -16,7 +16,8 @@ public partial class App : Application
     public static bool HotkeyMode { get; private set; }
 
     private Mutex? _mutex;
-    private EventWaitHandle? _showEvent;
+    // Indexed like InstanceSignals.All: [0]=Show, [1]=ClearCache, [2]=Settings, [3]=Preferences
+    private EventWaitHandle[]? _signalEvents;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private MainWindow? _activePopup;
 
@@ -29,15 +30,12 @@ public partial class App : Application
         HotkeyMode = prefs.HotkeyEnabled;
 
         // Single instance check (only when hotkey mode is on)
-        const string mutexName = "Groupa_SingleInstance_Mutex";
-        const string eventName = "Groupa_Show_Event";
-
         if (HotkeyMode)
         {
             bool isNew = false;
             try
             {
-                _mutex = new Mutex(true, mutexName, out isNew);
+                _mutex = new Mutex(true, MutexName, out isNew);
             }
             catch (AbandonedMutexException)
             {
@@ -46,24 +44,15 @@ public partial class App : Application
 
             if (!isNew)
             {
-                try
-                {
-                    using var evt = EventWaitHandle.OpenExisting(eventName);
-                    evt.Set();
-                }
-                catch { }
+                // Another instance is resident: forward this command line to it (Program.Main normally
+                // already did this; this covers races). Unknown arguments fall back to showing the popup.
+                if (!InstanceSignals.TrySignal(e.Args))
+                    InstanceSignals.TrySignal(Array.Empty<string>());
                 Shutdown();
                 return;
             }
 
-            try
-            {
-                _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
-            }
-            catch
-            {
-                try { _showEvent = EventWaitHandle.OpenExisting(eventName); } catch { }
-            }
+            _signalEvents = CreateSignalEvents();
         }
 
         // Load theme
@@ -74,7 +63,7 @@ public partial class App : Application
 
         base.OnStartup(e);
 
-        // Handle --settings / --preferences arguments
+        // Handle --settings / --preferences / --clear-cache arguments (no resident instance)
         if (e.Args.Length > 0)
         {
             if (e.Args[0] == "--settings")
@@ -91,12 +80,7 @@ public partial class App : Application
             }
             else if (e.Args[0] == "--clear-cache")
             {
-                ClearJumpListCache();
-                IconExtractor.ClearCache();
-                RegisterJumpList();
-                System.Windows.MessageBox.Show(
-                    Strings.IsKorean ? "캐시가 초기화되었습니다." : "Cache cleared.",
-                    "Groupa", MessageBoxButton.OK, MessageBoxImage.Information);
+                ClearCachesAndNotify();
                 Shutdown();
                 return;
             }
@@ -264,26 +248,115 @@ public partial class App : Application
         }
     }
 
+    private const string MutexName = "Groupa_SingleInstance_Mutex";
+
+    private static EventWaitHandle[]? CreateSignalEvents()
+    {
+        var events = new List<EventWaitHandle>();
+        foreach (var name in InstanceSignals.All)
+        {
+            try
+            {
+                events.Add(new EventWaitHandle(false, EventResetMode.AutoReset, name));
+            }
+            catch
+            {
+                try { events.Add(EventWaitHandle.OpenExisting(name)); }
+                catch { foreach (var ev in events) ev.Dispose(); return null; }
+            }
+        }
+        return events.ToArray();
+    }
+
+    private void DisposeSignalEvents()
+    {
+        if (_signalEvents == null) return;
+        foreach (var ev in _signalEvents) ev.Dispose();
+        _signalEvents = null;
+    }
+
+    /// <summary>
+    /// Listens for requests forwarded by relaunched instances (taskbar click, jump-list commands).
+    /// </summary>
     private void StartEventListener()
     {
+        var events = _signalEvents;
+        if (events == null) return;
+
         Task.Run(() =>
         {
-            while (_showEvent != null)
+            while (true)
             {
-                try
+                int index;
+                try { index = WaitHandle.WaitAny(events); }
+                catch { break; } // disposed: background mode turned off / exiting
+
+                Action? action = index switch
                 {
-                    if (_showEvent.WaitOne())
-                    {
-                        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send,
-                            (Action)(() => ShowPopup(PopupTrigger.Signal)));
-                    }
-                }
-                catch
-                {
-                    break;
-                }
+                    0 => () => ShowPopup(PopupTrigger.Signal),
+                    1 => () => { _activePopup?.SafeClose(); ClearCachesAndNotify(); },
+                    2 => () => { _activePopup?.SafeClose(); OpenSettingsDialog(); },
+                    3 => () => { _activePopup?.SafeClose(); OpenPreferencesDialog(); },
+                    _ => null
+                };
+                if (action != null)
+                    Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, action);
             }
         });
+    }
+
+    // === Dialogs (shared by popup buttons, tray menu and forwarded jump-list commands) ===
+
+    /// <summary>Brings an already open settings/preferences dialog to the front instead of stacking another.</summary>
+    private bool ActivateOpenDialog()
+    {
+        foreach (Window w in Windows)
+        {
+            if ((w is ConfigEditorWindow || w is PreferencesWindow) && w.IsVisible)
+            {
+                if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal;
+                w.Activate();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void OpenSettingsDialog(int groupIndex = 0)
+    {
+        if (ActivateOpenDialog()) return;
+
+        new ConfigEditorWindow(AppPaths.ConfigPath, groupIndex).ShowDialog();
+
+        if (!HotkeyMode)
+            Shutdown();
+    }
+
+    public void OpenPreferencesDialog()
+    {
+        if (ActivateOpenDialog()) return;
+
+        new PreferencesWindow().ShowDialog();
+        ReloadHotkey();
+
+        if (!HotkeyMode)
+            Shutdown();
+    }
+
+    /// <summary>Jump list "Clear Cache": wipe icon/name caches (incl. the pre-warmed popup) and re-register.</summary>
+    private void ClearCachesAndNotify()
+    {
+        ClearJumpListCache();
+        IconExtractor.ClearCache();
+        DiscardWindow(_prewarmed);
+        _prewarmed = null;
+        RegisterJumpList();
+
+        System.Windows.MessageBox.Show(
+            Strings.IsKorean ? "캐시가 초기화되었습니다." : "Cache cleared.",
+            "Groupa", MessageBoxButton.OK, MessageBoxImage.Information);
+
+        SchedulePrewarm();
     }
 
     /// <summary>
@@ -316,12 +389,10 @@ public partial class App : Application
             // Setup single instance mutex if not exists
             if (_mutex == null)
             {
-                const string mutexName = "Groupa_SingleInstance_Mutex";
-                const string eventName = "Groupa_Show_Event";
                 try
                 {
-                    _mutex = new Mutex(true, mutexName, out _);
-                    _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
+                    _mutex = new Mutex(true, MutexName, out _);
+                    _signalEvents = CreateSignalEvents();
                     StartEventListener();
                 }
                 catch { }
@@ -335,8 +406,7 @@ public partial class App : Application
             // Disable: remove tray icon
             _trayIcon?.Dispose();
             _trayIcon = null;
-            _showEvent?.Dispose();
-            _showEvent = null;
+            DisposeSignalEvents();
             if (_mutex != null)
             {
                 try { _mutex.ReleaseMutex(); } catch { }
@@ -382,11 +452,11 @@ public partial class App : Application
         var menu = new System.Windows.Forms.ContextMenuStrip();
         menu.Items.Add(Strings.Get("EditorTitle"), null, (s, e) =>
         {
-            Dispatcher.BeginInvoke(() => new ConfigEditorWindow(AppPaths.ConfigPath).ShowDialog());
+            Dispatcher.BeginInvoke(() => { _activePopup?.SafeClose(); OpenSettingsDialog(); });
         });
         menu.Items.Add(Strings.Get("Preferences"), null, (s, e) =>
         {
-            Dispatcher.BeginInvoke(() => new PreferencesWindow().ShowDialog());
+            Dispatcher.BeginInvoke(() => { _activePopup?.SafeClose(); OpenPreferencesDialog(); });
         });
         menu.Items.Add("-");
         menu.Items.Add(Strings.Get("Close").Replace("❌ ", ""), null, (s, e) =>
@@ -411,7 +481,7 @@ public partial class App : Application
         {
             try
             {
-                using var evt = new EventWaitHandle(false, EventResetMode.AutoReset, "Groupa_Show_Event");
+                using var evt = new EventWaitHandle(false, EventResetMode.AutoReset, InstanceSignals.Show);
                 await Task.Run(() => evt.WaitOne(3000));
             }
             catch { }
@@ -424,7 +494,7 @@ public partial class App : Application
     {
         HotkeyHelper.Unregister();
         _trayIcon?.Dispose();
-        _showEvent?.Dispose();
+        DisposeSignalEvents();
         if (_mutex != null)
         {
             try { _mutex.ReleaseMutex(); } catch { }
@@ -472,39 +542,17 @@ public partial class App : Application
         }
         catch { }
 
-        try
-        {
-            // Delete Windows Jump List cache files
-            var recentDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Microsoft", "Windows", "Recent");
-
-            var autoDest = Path.Combine(recentDir, "AutomaticDestinations");
-            var customDest = Path.Combine(recentDir, "CustomDestinations");
-
-            if (Directory.Exists(autoDest))
-            {
-                foreach (var f in Directory.GetFiles(autoDest, "*.automaticDestinations-ms"))
-                {
-                    try { File.Delete(f); } catch { }
-                }
-            }
-            if (Directory.Exists(customDest))
-            {
-                foreach (var f in Directory.GetFiles(customDest, "*.customDestinations-ms"))
-                {
-                    try { File.Delete(f); } catch { }
-                }
-            }
-        }
-        catch { }
+        // NOTE: Never delete files under %APPDATA%\Microsoft\Windows\Recent\{Automatic,Custom}Destinations.
+        // Those folders hold EVERY app's jump list, including File Explorer's Quick Access pins
+        // (f01b4d95cf55d32a.automaticDestinations-ms). Re-applying our own JumpList above is enough
+        // to reset Groupa's entries.
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         HotkeyHelper.Unregister();
         _trayIcon?.Dispose();
-        _showEvent?.Dispose();
+        DisposeSignalEvents();
         if (_mutex != null)
         {
             try { _mutex.ReleaseMutex(); } catch { }
