@@ -7,46 +7,6 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize">
     <Window.Resources>
-        <Style TargetType="Button" x:Key="EditorButton">
-            <Setter Property="Background" Value="{DynamicResource EditorButtonBg}"/>
-            <Setter Property="Foreground" Value="{DynamicResource ItemForeground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderColor}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="16,6"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}" 
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource EditorButtonHover}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource EditorButtonPressed}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style TargetType="TextBox" x:Key="EditorTextBox">
-            <Setter Property="Background" Value="{DynamicResource EditorInputBg}"/>
-            <Setter Property="Foreground" Value="{DynamicResource ItemForeground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource EditorBorderColor}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="CaretBrush" Value="{DynamicResource ItemForeground}"/>
-        </Style>
         <Style TargetType="ListBox" x:Key="EditorListBox">
             <Setter Property="Background" Value="{DynamicResource EditorInputBg}"/>
             <Setter Property="Foreground" Value="{DynamicResource ItemForeground}"/>

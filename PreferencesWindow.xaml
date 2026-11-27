@@ -4,7 +4,8 @@
         Title="Preferences"
         Width="380" SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Background="{DynamicResource EditorWindowBg}">
 
     <StackPanel Margin="24,20,24,20">
         <!-- Theme -->
@@ -56,24 +57,21 @@
                        Foreground="{DynamicResource ItemForeground}"/>
             <TextBox Grid.Column="2" x:Name="TxtHotkey"
                      Height="30" FontSize="13" IsReadOnly="True"
+                     Background="{DynamicResource EditorInputBg}" Foreground="{DynamicResource ItemForeground}"
+                     BorderBrush="{DynamicResource EditorBorderColor}"
                      VerticalContentAlignment="Center" TextAlignment="Center"
                      Cursor="Hand" PreviewKeyDown="TxtHotkey_PreviewKeyDown"
                      GotFocus="TxtHotkey_GotFocus" LostFocus="TxtHotkey_LostFocus"/>
         </Grid>
 
-        <!-- Notice -->
-        <TextBlock x:Name="TxtNotice" Text=""
-                   FontSize="11" Foreground="{DynamicResource HeaderForeground}"
-                   TextWrapping="Wrap" Margin="0,0,0,16"/>
-
         <!-- Buttons -->
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button x:Name="BtnSave" Content="Save" Width="80" Height="30"
-                    Margin="0,0,8,0" Click="BtnSave_Click"
-                    FontSize="13" Cursor="Hand"/>
+                    Margin="0,0,8,0" Click="BtnSave_Click" Padding="0"
+                    Style="{StaticResource EditorButton}"/>
             <Button x:Name="BtnCancel" Content="Cancel" Width="80" Height="30"
-                    Click="BtnCancel_Click"
-                    FontSize="13" Cursor="Hand"/>
+                    Click="BtnCancel_Click" Padding="0"
+                    Style="{StaticResource EditorButton}"/>
         </StackPanel>
     </StackPanel>
 </Window>

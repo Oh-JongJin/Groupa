@@ -20,6 +20,7 @@ public partial class PreferencesWindow : Window
     public PreferencesWindow()
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => DwmHelper.ApplyTitleBarTheme(this);
 
         _prefs = PreferencesHelper.Load();
         _hotkeyModifiers = _prefs.HotkeyModifiers;
@@ -30,7 +31,6 @@ public partial class PreferencesWindow : Window
         LblTheme.Text = Strings.Get("ThemeLabel");
         LblLanguage.Text = Strings.Get("LanguageLabel");
         LblHotkey.Text = Strings.Get("HotkeyLabel");
-        TxtNotice.Text = Strings.Get("RestartNotice");
         BtnSave.Content = Strings.Get("Save");
         BtnCancel.Content = Strings.Get("Cancel");
         ChkHotkeyEnabled.Content = Strings.Get("HotkeyEnabled");
@@ -136,7 +136,7 @@ public partial class PreferencesWindow : Window
 
         if (Application.Current is App app)
         {
-            app.ReloadHotkey();
+            app.ApplyPreferences();
         }
 
         DialogResult = true;

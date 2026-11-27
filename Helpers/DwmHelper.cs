@@ -30,6 +30,18 @@ public static class DwmHelper
     private const int DWMWCP_ROUND = 2;
     private const int DWMSBT_TRANSIENTWINDOW = 3; // Acrylic (popup-style)
 
+    /// <summary>Dark or light title bar for regular (non-popup) windows, matching the app theme.</summary>
+    public static void ApplyTitleBarTheme(Window window)
+    {
+        try
+        {
+            IntPtr hwnd = new WindowInteropHelper(window).EnsureHandle();
+            int darkMode = App.IsDarkMode ? 1 : 0;
+            DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+        }
+        catch { }
+    }
+
     public static void EnableMica(Window window)
     {
         bool isDark = App.IsDarkMode;

@@ -89,6 +89,7 @@ public partial class ConfigEditorWindow : Window
     public ConfigEditorWindow(string configPath, int initialGroupIndex = 0)
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => DwmHelper.ApplyTitleBarTheme(this);
         _configPath = configPath;
         _initialGroupIndex = initialGroupIndex;
 
@@ -329,6 +330,7 @@ public partial class ConfigEditorWindow : Window
             ResizeMode = ResizeMode.NoResize,
             Background = (System.Windows.Media.Brush)FindResource("EditorWindowBg")
         };
+        inputWindow.SourceInitialized += (_, _) => DwmHelper.ApplyTitleBarTheme(inputWindow);
 
         var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(16) };
         var label = new System.Windows.Controls.TextBlock
@@ -339,12 +341,13 @@ public partial class ConfigEditorWindow : Window
         };
         var textBox = new System.Windows.Controls.TextBox
         {
-            FontSize = 13, Padding = new Thickness(6, 4, 6, 4),
+            Style = (Style)FindResource("EditorTextBox"),
             Text = "https://"
         };
         var btnOk = new System.Windows.Controls.Button
         {
-            Content = "OK", Width = 80, Height = 30,
+            Content = "OK", Width = 80, Height = 30, Padding = new Thickness(0),
+            Style = (Style)FindResource("EditorButton"),
             Margin = new Thickness(0, 12, 0, 0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Right
         };
@@ -411,6 +414,7 @@ public partial class ConfigEditorWindow : Window
             ResizeMode = ResizeMode.NoResize,
             Background = (System.Windows.Media.Brush)FindResource("EditorWindowBg")
         };
+        inputWindow.SourceInitialized += (_, _) => DwmHelper.ApplyTitleBarTheme(inputWindow);
 
         var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(16) };
         var label = new System.Windows.Controls.TextBlock
@@ -421,13 +425,14 @@ public partial class ConfigEditorWindow : Window
         };
         var textBox = new System.Windows.Controls.TextBox
         {
-            FontSize = 13, Padding = new Thickness(6, 4, 6, 4),
+            Style = (Style)FindResource("EditorTextBox"),
             Text = currentName
         };
         textBox.SelectAll();
         var btnOk = new System.Windows.Controls.Button
         {
-            Content = "OK", Width = 80, Height = 30,
+            Content = "OK", Width = 80, Height = 30, Padding = new Thickness(0),
+            Style = (Style)FindResource("EditorButton"),
             Margin = new Thickness(0, 12, 0, 0),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Right
         };

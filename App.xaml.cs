@@ -55,11 +55,7 @@ public partial class App : Application
             _signalEvents = CreateSignalEvents();
         }
 
-        // Load theme
-        var themeUri = IsDarkMode
-            ? new Uri("Themes/DarkTheme.xaml", UriKind.Relative)
-            : new Uri("Themes/LightTheme.xaml", UriKind.Relative);
-        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = themeUri });
+        LoadThemeResources();
 
         base.OnStartup(e);
 
@@ -234,6 +230,44 @@ public partial class App : Application
         try { window.Close(); } catch { }
     }
 
+    private void LoadThemeResources()
+    {
+        var themeUri = IsDarkMode
+            ? new Uri("Themes/DarkTheme.xaml", UriKind.Relative)
+            : new Uri("Themes/LightTheme.xaml", UriKind.Relative);
+        Resources.MergedDictionaries.Clear();
+        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = themeUri });
+        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("Themes/Controls.xaml", UriKind.Relative) });
+    }
+
+    /// <summary>
+    /// Apply saved preferences to the running process: theme, language and hotkey/background mode.
+    /// New windows pick these up; the pre-warmed popup is rebuilt, tray menu and jump list are relabeled.
+    /// </summary>
+    public void ApplyPreferences()
+    {
+        var prefs = PreferencesHelper.Load();
+
+        Strings.SetLanguage(prefs.Language);
+        var dark = PreferencesHelper.ResolveDarkMode(prefs);
+        if (dark != IsDarkMode)
+        {
+            IsDarkMode = dark;
+            LoadThemeResources();
+        }
+
+        // The pre-warmed popup was built with the old theme/strings
+        DiscardWindow(_prewarmed);
+        _prewarmed = null;
+
+        if (_trayIcon != null)
+            _trayIcon.ContextMenuStrip = BuildTrayMenu();
+        RegisterJumpList();
+
+        ReloadHotkey();
+        SchedulePrewarm();
+    }
+
     private void SetupHotkey(Models.Preferences prefs)
     {
         bool ok = HotkeyHelper.Register(prefs.HotkeyModifiers, prefs.HotkeyKey, () => Dispatcher.BeginInvoke(() => ShowPopup(PopupTrigger.Hotkey)));
@@ -336,8 +370,7 @@ public partial class App : Application
     {
         if (ActivateOpenDialog()) return;
 
-        new PreferencesWindow().ShowDialog();
-        ReloadHotkey();
+        new PreferencesWindow().ShowDialog(); // applies on save via ApplyPreferences
 
         if (!HotkeyMode)
             Shutdown();
@@ -449,6 +482,11 @@ public partial class App : Application
                 Dispatcher.BeginInvoke(() => ShowPopup(PopupTrigger.Tray));
         };
 
+        _trayIcon.ContextMenuStrip = BuildTrayMenu();
+    }
+
+    private System.Windows.Forms.ContextMenuStrip BuildTrayMenu()
+    {
         var menu = new System.Windows.Forms.ContextMenuStrip();
         menu.Items.Add(Strings.Get("EditorTitle"), null, (s, e) =>
         {
@@ -464,7 +502,7 @@ public partial class App : Application
             Dispatcher.BeginInvoke(() => ExitApp());
         });
 
-        _trayIcon.ContextMenuStrip = menu;
+        return menu;
     }
 
     /// <summary>
