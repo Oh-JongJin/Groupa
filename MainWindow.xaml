@@ -165,11 +165,25 @@
 
             <Rectangle Grid.Row="4" Style="{DynamicResource MenuSeparator}" />
 
-            <StackPanel Grid.Row="5">
-                <Button x:Name="BtnSettings" Style="{DynamicResource FooterButton}" Click="Settings_Click" />
-                <Button x:Name="BtnPreferences" Style="{DynamicResource FooterButton}" Click="Preferences_Click" />
-                <Button x:Name="BtnClose" Style="{DynamicResource FooterButton}" Click="Close_Click" />
-            </StackPanel>
+            <!-- Footer: one row. No Close button: Esc, clicking outside or the taskbar button close the popup. -->
+            <UniformGrid Grid.Row="5" Rows="1" Columns="2">
+                <Button x:Name="BtnSettings" Style="{DynamicResource FooterButton}" Click="Settings_Click"
+                        HorizontalContentAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8FD;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,1,8,0"/>
+                        <TextBlock x:Name="TxtSettings" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="BtnPreferences" Style="{DynamicResource FooterButton}" Click="Preferences_Click"
+                        HorizontalContentAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                                   VerticalAlignment="Center" Margin="0,1,8,0"/>
+                        <TextBlock x:Name="TxtPreferences" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </UniformGrid>
 
             <!-- Undo bar after quick-delete (✕). Overlays the footer so the app list layout never shifts. -->
             <Border x:Name="UndoBar" Grid.Row="4" Grid.RowSpan="2"

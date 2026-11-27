@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -39,6 +40,71 @@ public static class IconExtractor
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyIcon(IntPtr hIcon);
+
+    [ComImport, Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellItem
+    {
+        void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+        void GetParent(out IShellItem ppsi);
+        void GetDisplayName(uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
+        void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+        void Compare(IShellItem psi, uint hint, out int piOrder);
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
+    private static extern void SHCreateItemFromParsingName(string pszPath, IntPtr pbc,
+        [In] ref Guid riid, [MarshalAs(UnmanagedType.Interface)] out IShellItem ppv);
+
+    private const uint SIGDN_NORMALDISPLAY = 0;
+
+    /// <summary>
+    /// Inbox Windows executables whose file description isn't localized (e.g. calc.exe reports
+    /// "Windows Calculator" on a Korean system) or differs from the Start menu name. Their names are
+    /// read from the Start menu (shell:AppsFolder), so Windows supplies the localized text.
+    /// </summary>
+    private static readonly Dictionary<string, string> InboxAppIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["calc.exe"] = "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+        ["explorer.exe"] = "Microsoft.Windows.Explorer",
+        ["notepad.exe"] = "Microsoft.WindowsNotepad_8wekyb3d8bbwe!App",
+        ["mspaint.exe"] = "Microsoft.Paint_8wekyb3d8bbwe!App",
+        ["snippingtool.exe"] = "Microsoft.ScreenSketch_8wekyb3d8bbwe!App",
+    };
+
+    private static string? GetInboxAppName(string path, string resolvedPath)
+    {
+        var fileName = Path.GetFileName(path);
+        if (!InboxAppIds.TryGetValue(fileName, out var appId)) return null;
+
+        // Only for the Windows copy (or a bare name resolved via PATH), not a same-named file elsewhere
+        bool isBareName = !Path.IsPathRooted(path);
+        var winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (!isBareName && !resolvedPath.StartsWith(winDir + "\\", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            var iid = typeof(IShellItem).GUID;
+            SHCreateItemFromParsingName("shell:AppsFolder\\" + appId, IntPtr.Zero, ref iid, out var item);
+            item.GetDisplayName(SIGDN_NORMALDISPLAY, out var name);
+            Marshal.ReleaseComObject(item);
+            return string.IsNullOrWhiteSpace(name) ? null : name;
+        }
+        catch
+        {
+            return null; // app not installed (e.g. classic Paint only) → fall back to file info
+        }
+    }
+
+    /// <summary>"Tool.exe" → "Tool" for files; Explorer shows extensions when "File name extensions" is on.</summary>
+    private static string StripExtension(string name, string resolvedPath)
+    {
+        if (Directory.Exists(resolvedPath)) return name;
+        var ext = Path.GetExtension(resolvedPath);
+        if (!string.IsNullOrEmpty(ext) && name.EndsWith(ext, StringComparison.OrdinalIgnoreCase) && name.Length > ext.Length)
+            return name.Substring(0, name.Length - ext.Length);
+        return name;
+    }
 
     public static BitmapSource? GetCachedIcon(string path)
     {
@@ -191,6 +257,14 @@ public static class IconExtractor
             if (found != null) resolvedPath = found;
         }
 
+        // 0. Inbox Windows apps: use the Start menu's localized name
+        var inboxName = GetInboxAppName(path, resolvedPath);
+        if (inboxName != null)
+        {
+            _displayNameCache[path] = inboxName;
+            return inboxName;
+        }
+
         // 1. Try FileVersionInfo.FileDescription (most reliable for localized names)
         try
         {
@@ -219,8 +293,9 @@ public static class IconExtractor
 
             if (res != IntPtr.Zero && !string.IsNullOrWhiteSpace(shinfo.szDisplayName))
             {
-                _displayNameCache[path] = shinfo.szDisplayName;
-                return shinfo.szDisplayName;
+                var shellName = StripExtension(shinfo.szDisplayName, resolvedPath);
+                _displayNameCache[path] = shellName;
+                return shellName;
             }
         }
         catch { }

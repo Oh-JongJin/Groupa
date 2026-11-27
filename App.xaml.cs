@@ -55,11 +55,8 @@ public partial class App : Application
             _signalEvents = CreateSignalEvents();
         }
 
-        // Load theme
-        var themeUri = IsDarkMode
-            ? new Uri("Themes/DarkTheme.xaml", UriKind.Relative)
-            : new Uri("Themes/LightTheme.xaml", UriKind.Relative);
-        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = themeUri });
+        LoadThemeResources();
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 
         base.OnStartup(e);
 
@@ -234,6 +231,134 @@ public partial class App : Application
         try { window.Close(); } catch { }
     }
 
+    private static bool _highContrastApplied;
+
+    private void LoadThemeResources()
+    {
+        var themeUri = IsDarkMode
+            ? new Uri("Themes/DarkTheme.xaml", UriKind.Relative)
+            : new Uri("Themes/LightTheme.xaml", UriKind.Relative);
+        var theme = new ResourceDictionary { Source = themeUri };
+
+        // Windows high contrast: replace every theme color with the user's system colors. Done on the
+        // dictionary before it is used, so the styles inside it (StaticResource) pick up these values.
+        _highContrastApplied = SystemParameters.HighContrast;
+        if (_highContrastApplied)
+            ApplyHighContrastColors(theme);
+
+        Resources.MergedDictionaries.Clear();
+        Resources.MergedDictionaries.Add(theme);
+        Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("Themes/Controls.xaml", UriKind.Relative) });
+    }
+
+    private static void ApplyHighContrastColors(ResourceDictionary d)
+    {
+        static System.Windows.Media.Color Alpha(System.Windows.Media.Color c, byte a) =>
+            System.Windows.Media.Color.FromArgb(a, c.R, c.G, c.B);
+        void Brush(string key, System.Windows.Media.Color c)
+        {
+            var b = new System.Windows.Media.SolidColorBrush(c);
+            b.Freeze();
+            d[key] = b;
+        }
+
+        var window = System.Windows.SystemColors.WindowColor;
+        var text = System.Windows.SystemColors.WindowTextColor;
+        var highlight = System.Windows.SystemColors.HighlightColor;
+        var highlightText = System.Windows.SystemColors.HighlightTextColor;
+        var gray = System.Windows.SystemColors.GrayTextColor;
+        var face = System.Windows.SystemColors.ControlColor;
+        var hover = Alpha(highlight, 0x55);
+        var pressed = Alpha(highlight, 0x80);
+
+        // Popup
+        Brush("PopupBackground", window);
+        Brush("PopupBorder", text);
+        Brush("HeaderForeground", text);
+        Brush("ItemForeground", text);
+        Brush("ItemHoverBackground", hover);
+        Brush("ItemFocusBackground", pressed);
+        Brush("SeparatorBrush", gray);
+        Brush("FooterItemForeground", text);
+        Brush("TabSelectedBackground", hover);
+        Brush("TabSelectedBorder", highlight);
+        Brush("TabSelectedForeground", text);
+        d["HoverColor"] = hover;
+        d["TransparentColor"] = Alpha(window, 0);
+
+        // Settings windows
+        Brush("EditorWindowBg", window);
+        Brush("EditorButtonBg", face);
+        Brush("EditorButtonHover", hover);
+        Brush("EditorButtonPressed", pressed);
+        Brush("EditorInputBg", window);
+        Brush("EditorBorderColor", text);
+        Brush("EditorSelectedBg", pressed);
+        Brush("EditorSecondaryText", gray);
+        Brush("EditorAccent", highlight);
+        Brush("EditorAccentForeground", highlightText);
+    }
+
+    /// <summary>
+    /// Apply saved preferences to the running process: theme, language and hotkey/background mode.
+    /// New windows pick these up; the pre-warmed popup is rebuilt, tray menu and jump list are relabeled.
+    /// </summary>
+    public void ApplyPreferences()
+    {
+        var prefs = PreferencesHelper.Load();
+
+        Strings.SetLanguage(prefs.Language);
+        var dark = PreferencesHelper.ResolveDarkMode(prefs);
+        if (dark != IsDarkMode)
+        {
+            IsDarkMode = dark;
+            LoadThemeResources();
+        }
+
+        // The pre-warmed popup was built with the old theme/strings
+        DiscardWindow(_prewarmed);
+        _prewarmed = null;
+
+        if (_trayIcon != null)
+            _trayIcon.ContextMenuStrip = BuildTrayMenu();
+        RegisterJumpList();
+
+        ReloadHotkey();
+        SchedulePrewarm();
+    }
+
+    /// <summary>
+    /// Windows light/dark or high contrast switch while running (matters in background mode, where the
+    /// process stays up). Light/dark only counts when the theme preference is "system".
+    /// </summary>
+    private void OnUserPreferenceChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+    {
+        // The light/dark switch arrives as WM_SETTINGCHANGE "ImmersiveColorSet" → General
+        if (e.Category is not (Microsoft.Win32.UserPreferenceCategory.General
+            or Microsoft.Win32.UserPreferenceCategory.Color
+            or Microsoft.Win32.UserPreferenceCategory.VisualStyle
+            or Microsoft.Win32.UserPreferenceCategory.Accessibility)) return;
+        Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                var prefs = PreferencesHelper.Load();
+                var dark = PreferencesHelper.ResolveDarkMode(prefs); // fixed dark/light ignores Windows
+                bool highContrast = SystemParameters.HighContrast;
+                // Color category: high contrast colors themselves may have changed
+                bool colorsChanged = highContrast && e.Category == Microsoft.Win32.UserPreferenceCategory.Color;
+                if (dark == IsDarkMode && highContrast == _highContrastApplied && !colorsChanged) return;
+
+                IsDarkMode = dark;
+                LoadThemeResources();
+                DiscardWindow(_prewarmed);
+                _prewarmed = null;
+                SchedulePrewarm();
+            }
+            catch { }
+        });
+    }
+
     private void SetupHotkey(Models.Preferences prefs)
     {
         bool ok = HotkeyHelper.Register(prefs.HotkeyModifiers, prefs.HotkeyKey, () => Dispatcher.BeginInvoke(() => ShowPopup(PopupTrigger.Hotkey)));
@@ -336,8 +461,7 @@ public partial class App : Application
     {
         if (ActivateOpenDialog()) return;
 
-        new PreferencesWindow().ShowDialog();
-        ReloadHotkey();
+        new PreferencesWindow().ShowDialog(); // applies on save via ApplyPreferences
 
         if (!HotkeyMode)
             Shutdown();
@@ -352,7 +476,7 @@ public partial class App : Application
         _prewarmed = null;
         RegisterJumpList();
 
-        System.Windows.MessageBox.Show(
+        ThemedDialog.Show(
             Strings.IsKorean ? "캐시가 초기화되었습니다." : "Cache cleared.",
             "Groupa", MessageBoxButton.OK, MessageBoxImage.Information);
 
@@ -449,6 +573,11 @@ public partial class App : Application
                 Dispatcher.BeginInvoke(() => ShowPopup(PopupTrigger.Tray));
         };
 
+        _trayIcon.ContextMenuStrip = BuildTrayMenu();
+    }
+
+    private System.Windows.Forms.ContextMenuStrip BuildTrayMenu()
+    {
         var menu = new System.Windows.Forms.ContextMenuStrip();
         menu.Items.Add(Strings.Get("EditorTitle"), null, (s, e) =>
         {
@@ -459,12 +588,12 @@ public partial class App : Application
             Dispatcher.BeginInvoke(() => { _activePopup?.SafeClose(); OpenPreferencesDialog(); });
         });
         menu.Items.Add("-");
-        menu.Items.Add(Strings.Get("Close").Replace("❌ ", ""), null, (s, e) =>
+        menu.Items.Add(Strings.Get("Close"), null, (s, e) =>
         {
             Dispatcher.BeginInvoke(() => ExitApp());
         });
 
-        _trayIcon.ContextMenuStrip = menu;
+        return menu;
     }
 
     /// <summary>
@@ -550,6 +679,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         HotkeyHelper.Unregister();
         _trayIcon?.Dispose();
         DisposeSignalEvents();
