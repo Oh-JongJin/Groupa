@@ -67,8 +67,20 @@ public partial class MainWindow : Window
     private bool _initialHeightLocked;
     private bool _isClosing;
 
-    public MainWindow()
+    private readonly bool _suppressLoadErrors;
+
+    /// <summary>True if the config failed to load (only tracked for pre-warmed windows).</summary>
+    public bool LoadFailed { get; private set; }
+
+    public MainWindow() : this(prewarm: false) { }
+
+    /// <param name="prewarm">
+    /// Built ahead of time while idle (background mode) so the next show is instant.
+    /// Load errors are not shown here; the caller discards the window and builds a fresh one on show.
+    /// </param>
+    public MainWindow(bool prewarm)
     {
+        _suppressLoadErrors = prewarm;
         InitializeComponent();
         _configPath = AppPaths.ConfigPath;
 
@@ -166,6 +178,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            LoadFailed = true;
+            if (_suppressLoadErrors) return;
             MessageBox.Show($"{Strings.Get("ErrorLoad")}: {ex.Message}", Strings.Get("Error"),
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -257,9 +271,53 @@ public partial class MainWindow : Window
         File.WriteAllText(_configPath, JsonSerializer.Serialize(config, options));
     }
 
+    private bool _handlePrepared;
+
+    /// <summary>
+    /// Create the HWND and apply the backdrop without showing the window, so background mode can do it
+    /// ahead of time while idle. Layout can't be done here (WPF skips layout for hidden windows), so
+    /// sizing/positioning still happens in Loaded, inside Show(). Idempotent.
+    /// </summary>
+    public void PrepareHandle()
+    {
+        if (_handlePrepared) return;
+        _handlePrepared = true;
+
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
+        System.Windows.Interop.HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+        DwmHelper.EnableMica(this);
+    }
+
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_MINIMIZE = 0xF020;
+
+    /// <summary>
+    /// The popup is shown in the taskbar (so the pinned button gets the "running" underline). Clicking
+    /// the taskbar button of the active window then asks it to minimize instead of relaunching the exe,
+    /// so treat that as the toggle-close. (ResizeMode=CanMinimize is required for the taskbar to send it.)
+    /// </summary>
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_SYSCOMMAND && (wParam.ToInt64() & 0xFFF0) == SC_MINIMIZE)
+        {
+            handled = true;
+            // No relaunch/signal follows this click, so the deactivation must not arm the signal swallow
+            _closingByTaskbarToggle = true;
+            Dispatcher.BeginInvoke(SafeClose);
+        }
+        return IntPtr.Zero;
+    }
+
+    public void ShowPopupWindow()
+    {
+        PrepareHandle();
+        Show();
+        Activate();
+    }
+
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        DwmHelper.EnableMica(this);
+        PrepareHandle();
         UpdateLayout();
 
         var (left, top) = WindowPositioner.CalculatePosition(this);
@@ -279,11 +337,22 @@ public partial class MainWindow : Window
         _iconCenterX = left + (ActualWidth / 2.0);
         _anchored = true;
 
-        Activate();
+        // No Activate() here: with a pre-created handle, Loaded fires in the middle of Show() where
+        // Activate() throws. ShowPopupWindow() activates right after Show() returns.
 
         // Load details and icons asynchronously in background
         StartBackgroundDetailsLoading();
     }
+
+    /// <summary>True if the popup closed because the user clicked somewhere on the taskbar/tray.</summary>
+    public bool DeactivatedOnTaskbar { get; private set; }
+
+    /// <summary>
+    /// Set when the popup lost focus to a taskbar click: resolves to true if that click was on our own
+    /// taskbar button. That click relaunches the exe and signals "show" ~1s later, which must be swallowed
+    /// so the click acts as a toggle instead of close-then-reopen.
+    /// </summary>
+    public Task<bool>? OwnButtonClickCheck { get; private set; }
 
     public void SafeClose()
     {
@@ -300,12 +369,22 @@ public partial class MainWindow : Window
 
         if (!App.HotkeyMode)
         {
-            Application.Current.Shutdown();
+            if (OwnButtonClickCheck != null && Application.Current is App app)
+                app.ShutdownSwallowingRelaunch(OwnButtonClickCheck);
+            else
+                Application.Current.Shutdown();
         }
     }
 
+    private bool _closingByTaskbarToggle;
+
     private void MainWindow_Deactivated(object? sender, EventArgs e)
     {
+        if (!_closingByTaskbarToggle && WindowPositioner.IsCursorOverTaskbar())
+        {
+            DeactivatedOnTaskbar = true;
+            OwnButtonClickCheck = WindowPositioner.IsCursorOnOwnTaskbarButtonAsync();
+        }
         SafeClose();
     }
 

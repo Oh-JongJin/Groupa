@@ -7,11 +7,11 @@
         mc:Ignorable="d"
         WindowStyle="None"
         Background="#012C2C2C"
-        ShowInTaskbar="False"
-        ResizeMode="NoResize"
+        ShowInTaskbar="True"
+        ResizeMode="CanMinimize"
         SizeToContent="WidthAndHeight"
         Topmost="True"
-        Title="JumpListLauncher"
+        Title="Groupa"
         MinWidth="280"
         MaxWidth="340">
 

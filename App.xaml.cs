@@ -103,7 +103,7 @@ public partial class App : Application
         }
 
         // Pre-search taskbar button
-        Task.Run(() => WindowPositioner.PreFindTaskbarButton());
+        Task.Run(WindowPositioner.RefreshTaskbarButtonCache);
 
         // Register Jump List asynchronously in background so popup opens instantly
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(() =>
@@ -120,10 +120,18 @@ public partial class App : Application
         }
 
         // Show popup on first launch
-        ShowPopup();
+        ShowPopup(PopupTrigger.Startup);
     }
 
-    public void ShowPopup()
+    public enum PopupTrigger { Startup, Hotkey, Signal, Tray }
+
+    private bool _showPending;
+    // Set when the popup closed because the user clicked the taskbar; see MainWindow.OwnButtonClickCheck
+    private Task<bool>? _ownButtonCloseCheck;
+    private DateTime _ownButtonCloseUtc;
+    private DateTime _lastTaskbarCloseUtc;
+
+    public async void ShowPopup(PopupTrigger trigger)
     {
         // If popup is already open, toggle it closed
         if (_activePopup != null && _activePopup.IsLoaded)
@@ -132,17 +140,119 @@ public partial class App : Application
             return;
         }
 
-        WindowPositioner.UpdateCursorPosition();
-        var mainWindow = new MainWindow();
+        // Clicking our taskbar button while the popup is open first closes it (focus loss), then the
+        // relaunched exe signals "show" ~1s later. Swallow that one signal so the click acts as a toggle.
+        if (trigger == PopupTrigger.Signal && _ownButtonCloseCheck is { } check)
+        {
+            _ownButtonCloseCheck = null;
+            if ((DateTime.UtcNow - _ownButtonCloseUtc).TotalSeconds < 3)
+            {
+                bool own = false;
+                try { own = await check; } catch { }
+                if (own) return;
+            }
+        }
+
+        // Same for the tray icon: mouse-down closes the popup, then MouseClick fires on mouse-up.
+        if (trigger == PopupTrigger.Tray && (DateTime.UtcNow - _lastTaskbarCloseUtc).TotalMilliseconds < 500)
+            return;
+
+        // Ignore repeated triggers while the taskbar button lookup is in flight
+        if (_showPending) return;
+        _showPending = true;
+        try
+        {
+            await WindowPositioner.UpdateCursorPositionAsync();
+        }
+        catch { }
+        finally
+        {
+            _showPending = false;
+        }
+
+        var mainWindow = TakePrewarmedOrNewWindow();
         _activePopup = mainWindow;
-        mainWindow.Closed += (s, e) => _activePopup = null;
-        mainWindow.Show();
-        mainWindow.Activate();
+        mainWindow.Closed += (s, e) =>
+        {
+            _activePopup = null;
+            SchedulePrewarm();
+            if (mainWindow.DeactivatedOnTaskbar)
+                _lastTaskbarCloseUtc = DateTime.UtcNow;
+            if (mainWindow.OwnButtonClickCheck is { } ownCheck)
+            {
+                _ownButtonCloseCheck = ownCheck;
+                _ownButtonCloseUtc = DateTime.UtcNow;
+            }
+        };
+        mainWindow.ShowPopupWindow();
+    }
+
+    // === Pre-warmed popup (background mode only) ===
+    // Building MainWindow (XAML parse, config load, icon cache lookups) is the bulk of the show latency,
+    // so after a popup closes we build the next one while idle and just Show() it on the next trigger.
+    private MainWindow? _prewarmed;
+    private (DateTime Config, DateTime Prefs) _prewarmedStamp;
+
+    private static (DateTime Config, DateTime Prefs) GetSettingsStamp()
+    {
+        try
+        {
+            return (File.GetLastWriteTimeUtc(AppPaths.ConfigPath), File.GetLastWriteTimeUtc(AppPaths.PreferencesPath));
+        }
+        catch
+        {
+            return (DateTime.MinValue, DateTime.MinValue);
+        }
+    }
+
+    private void SchedulePrewarm()
+    {
+        if (!HotkeyMode || _prewarmed != null) return;
+
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, (Action)(() =>
+        {
+            if (!HotkeyMode || _prewarmed != null || _activePopup != null) return;
+            try
+            {
+                // Take the stamp first: if the ctor itself writes a default config, the window is discarded later
+                var stamp = GetSettingsStamp();
+                var window = new MainWindow(prewarm: true);
+                if (!window.LoadFailed)
+                    window.PrepareHandle();
+                _prewarmedStamp = stamp;
+                _prewarmed = window;
+            }
+            catch
+            {
+                _prewarmed = null;
+            }
+        }));
+    }
+
+    private MainWindow TakePrewarmedOrNewWindow()
+    {
+        var window = _prewarmed;
+        _prewarmed = null;
+
+        // Discard if config/preferences changed since it was built (editor, reorder, language/theme…),
+        // or if loading failed (a fresh window shows the error to the user).
+        if (window != null && !window.LoadFailed && GetSettingsStamp() == _prewarmedStamp)
+            return window;
+
+        DiscardWindow(window);
+        return new MainWindow();
+    }
+
+    // A constructed Window is registered in Application.Windows; closing it (even never shown) unregisters it.
+    private static void DiscardWindow(MainWindow? window)
+    {
+        if (window == null) return;
+        try { window.Close(); } catch { }
     }
 
     private void SetupHotkey(Models.Preferences prefs)
     {
-        bool ok = HotkeyHelper.Register(prefs.HotkeyModifiers, prefs.HotkeyKey, () => Dispatcher.BeginInvoke(ShowPopup));
+        bool ok = HotkeyHelper.Register(prefs.HotkeyModifiers, prefs.HotkeyKey, () => Dispatcher.BeginInvoke(() => ShowPopup(PopupTrigger.Hotkey)));
         if (!ok && _trayIcon != null)
         {
             var hotkeyText = HotkeyHelper.FormatHotkey(prefs.HotkeyModifiers, prefs.HotkeyKey);
@@ -164,7 +274,8 @@ public partial class App : Application
                 {
                     if (_showEvent.WaitOne())
                     {
-                        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, (Action)ShowPopup);
+                        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send,
+                            (Action)(() => ShowPopup(PopupTrigger.Signal)));
                     }
                 }
                 catch
@@ -218,6 +329,9 @@ public partial class App : Application
         }
         else
         {
+            DiscardWindow(_prewarmed);
+            _prewarmed = null;
+
             // Disable: remove tray icon
             _trayIcon?.Dispose();
             _trayIcon = null;
@@ -262,7 +376,7 @@ public partial class App : Application
         _trayIcon.MouseClick += (s, e) =>
         {
             if (e.Button == System.Windows.Forms.MouseButtons.Left)
-                Dispatcher.BeginInvoke(ShowPopup);
+                Dispatcher.BeginInvoke(() => ShowPopup(PopupTrigger.Tray));
         };
 
         var menu = new System.Windows.Forms.ContextMenuStrip();
@@ -281,6 +395,29 @@ public partial class App : Application
         });
 
         _trayIcon.ContextMenuStrip = menu;
+    }
+
+    /// <summary>
+    /// Non-background mode: the popup closed because our own taskbar button was clicked. That click
+    /// relaunches the exe ~1s later, which would open a fresh popup. Briefly own the show event so the
+    /// relaunched instance just signals it and exits (Program.Main), then shut down.
+    /// </summary>
+    public async void ShutdownSwallowingRelaunch(Task<bool> ownButtonCheck)
+    {
+        bool own = false;
+        try { own = await ownButtonCheck; } catch { }
+
+        if (own)
+        {
+            try
+            {
+                using var evt = new EventWaitHandle(false, EventResetMode.AutoReset, "Groupa_Show_Event");
+                await Task.Run(() => evt.WaitOne(3000));
+            }
+            catch { }
+        }
+
+        Shutdown();
     }
 
     private void ExitApp()

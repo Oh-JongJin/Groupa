@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace JumpListLauncher;
@@ -25,6 +26,14 @@ public static class Program
         }
 
         // 2. Normal startup: run full WPF App
+        RunApp();
+    }
+
+    // Kept in a separate non-inlined method so that Main itself never references WPF types:
+    // the signal-and-exit path above then doesn't load PresentationFramework & co. at all.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RunApp()
+    {
         var app = new App();
         app.InitializeComponent();
         app.Run();

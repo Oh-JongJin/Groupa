@@ -55,27 +55,149 @@ public static class WindowPositioner
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-    // Cache the button rect per launch
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(POINT pt);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
+    private const uint GA_ROOT = 2;
+
+    // Taskbar button rect used for positioning. Written from background threads, so guard with a lock.
+    private static readonly object _rectLock = new();
     private static System.Windows.Rect? _cachedButtonRect;
-    // Cache cursor position at startup (before WPF window steals focus)
+    // Cursor position captured right before the popup is shown (before WPF window steals focus)
     private static POINT _startupCursorPos;
 
-    /// <summary>
-    /// Update cursor position right before showing the popup.
-    /// </summary>
-    public static void UpdateCursorPosition()
+    private static System.Windows.Rect? CachedButtonRect
     {
-        GetCursorPos(out _startupCursorPos);
+        get { lock (_rectLock) return _cachedButtonRect; }
+        set { lock (_rectLock) _cachedButtonRect = value; }
     }
 
     /// <summary>
-    /// Pre-search the taskbar button position. Call this as early as possible (App.OnStartup).
-    /// Also captures cursor position before WPF window appears.
+    /// Capture cursor position and resolve the taskbar button right before showing the popup.
+    /// Taskbar icons move whenever apps open/close (especially with a centered Windows 11 taskbar),
+    /// so a rect cached at process start goes stale in background mode.
     /// </summary>
-    public static void PreFindTaskbarButton()
+    public static async Task UpdateCursorPositionAsync()
     {
         GetCursorPos(out _startupCursorPos);
-        _cachedButtonRect = FindTaskbarButtonRect();
+        var pt = _startupCursorPos;
+
+        var taskbarHwnd = GetTaskbarUnderPoint(pt);
+        if (taskbarHwnd != IntPtr.Zero)
+        {
+            // Launched by clicking a taskbar/tray button: the button under the cursor is the anchor.
+            // UIA client calls must NOT run on (or block) the UI thread — they can deadlock it — so
+            // look it up on a worker thread and await with a short timeout while the UI thread keeps
+            // pumping. If it can't be resolved in time, fall back to the cursor X (still accurate)
+            // instead of a stale cache.
+            var lookup = Task.Run(() => FindButtonAtPoint(taskbarHwnd, pt));
+            var done = await Task.WhenAny(lookup, Task.Delay(300));
+            CachedButtonRect = done == lookup ? lookup.Result?.Rect : null;
+        }
+        else
+        {
+            // Hotkey etc.: refresh the cached rect in background; it usually finishes before Loaded.
+            _ = Task.Run(RefreshTaskbarButtonCache);
+        }
+    }
+
+    /// <summary>
+    /// Search the taskbar for this app's button and cache its rect. Safe to call from a background thread.
+    /// </summary>
+    public static void RefreshTaskbarButtonCache()
+    {
+        var rect = FindTaskbarButtonRect();
+        if (rect.HasValue) CachedButtonRect = rect;
+    }
+
+    /// <summary>
+    /// True if the cursor is currently over a taskbar (including the tray area). Pure Win32, UI-thread safe.
+    /// </summary>
+    public static bool IsCursorOverTaskbar()
+    {
+        GetCursorPos(out var pt);
+        return GetTaskbarUnderPoint(pt) != IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Checks (off the UI thread) whether the cursor is on this app's own taskbar button,
+    /// i.e. the click that will relaunch us and signal "show popup". Captures the cursor now.
+    /// </summary>
+    public static Task<bool> IsCursorOnOwnTaskbarButtonAsync()
+    {
+        GetCursorPos(out var pt);
+        var taskbarHwnd = GetTaskbarUnderPoint(pt);
+        if (taskbarHwnd == IntPtr.Zero) return Task.FromResult(false);
+
+        return Task.Run(() =>
+        {
+            var hit = FindButtonAtPoint(taskbarHwnd, pt);
+            if (hit == null) return false;
+            string exeName = Process.GetCurrentProcess().ProcessName;
+            // Pinned/running taskbar buttons are named "<app> ..."; skip tray icons whose tooltip
+            // just mentions the app (the tray click is handled in-process).
+            return hit.Value.ClassName.StartsWith("Taskbar.", StringComparison.Ordinal) &&
+                   hit.Value.Name.StartsWith(exeName, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    /// <summary>
+    /// Returns the taskbar window (Shell_TrayWnd / Shell_SecondaryTrayWnd) under the point, or IntPtr.Zero.
+    /// Pure Win32, safe on the UI thread.
+    /// </summary>
+    private static IntPtr GetTaskbarUnderPoint(POINT pt)
+    {
+        try
+        {
+            var hwnd = WindowFromPoint(pt);
+            if (hwnd == IntPtr.Zero) return IntPtr.Zero;
+            var root = GetAncestor(hwnd, GA_ROOT);
+            if (root == IntPtr.Zero) root = hwnd;
+            var sb = new System.Text.StringBuilder(64);
+            GetClassName(root, sb, sb.Capacity);
+            var cls = sb.ToString();
+            return cls == "Shell_TrayWnd" || cls == "Shell_SecondaryTrayWnd" ? root : IntPtr.Zero;
+        }
+        catch { return IntPtr.Zero; }
+    }
+
+    /// <summary>
+    /// Finds the taskbar button under the point. The Windows 11 taskbar is a XAML island, so
+    /// AutomationElement.FromPoint stops at the Shell_TrayWnd pane; instead enumerate the taskbar's
+    /// buttons and pick the smallest one containing the point. Must run off the UI thread.
+    /// </summary>
+    private static (System.Windows.Rect Rect, string Name, string ClassName)? FindButtonAtPoint(IntPtr taskbarHwnd, POINT pt)
+    {
+        try
+        {
+            var taskbar = AutomationElement.FromHandle(taskbarHwnd);
+            var condition = new OrCondition(
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem));
+
+            (System.Windows.Rect Rect, string Name, string ClassName)? best = null;
+            foreach (AutomationElement el in taskbar.FindAll(TreeScope.Descendants, condition))
+            {
+                try
+                {
+                    var rect = el.Current.BoundingRectangle;
+                    if (rect.IsEmpty || rect.Width <= 0 || rect.Height <= 0) continue;
+                    if (!rect.Contains(pt.x, pt.y)) continue;
+                    if (best == null || rect.Width * rect.Height < best.Value.Rect.Width * best.Value.Rect.Height)
+                        best = (rect, el.Current.Name ?? "", el.Current.ClassName ?? "");
+                }
+                catch { }
+            }
+            return best;
+        }
+        catch { }
+        return null;
     }
 
     public static (double Left, double Top) CalculatePosition(Window window)
@@ -140,7 +262,7 @@ public static class WindowPositioner
         }
 
         // Use cached button rect if it's on this monitor
-        var buttonRect = _cachedButtonRect;
+        var buttonRect = CachedButtonRect;
         double iconCenterX;
 
         if (buttonRect.HasValue &&
