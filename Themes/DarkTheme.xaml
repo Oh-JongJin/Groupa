@@ -104,7 +104,7 @@
                         <Border.Background>
                             <SolidColorBrush Color="{StaticResource TransparentColor}" />
                         </Border.Background>
-                        <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" />
+                        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <EventTrigger RoutedEvent="MouseEnter">

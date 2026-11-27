@@ -497,7 +497,7 @@ public partial class App : Application
             Dispatcher.BeginInvoke(() => { _activePopup?.SafeClose(); OpenPreferencesDialog(); });
         });
         menu.Items.Add("-");
-        menu.Items.Add(Strings.Get("Close").Replace("❌ ", ""), null, (s, e) =>
+        menu.Items.Add(Strings.Get("Close"), null, (s, e) =>
         {
             Dispatcher.BeginInvoke(() => ExitApp());
         });

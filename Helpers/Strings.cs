@@ -7,8 +7,8 @@ public static class Strings
 {
     private static readonly Dictionary<string, string> Ko = new()
     {
-        ["Settings"]       = "📋 그룹 설정",
-        ["Close"]          = "❌ 닫기",
+        ["Settings"]       = "그룹 설정",
+        ["Close"]          = "닫기",
         ["EditorTitle"]    = "그룹 설정",
         ["GroupName"]      = "그룹 이름",
         ["AppList"]        = "등록된 앱 목록",
@@ -25,7 +25,7 @@ public static class Strings
         ["ErrorLoad"]      = "설정 불러오기 실패",
         ["ErrorLaunch"]    = "실행 실패",
         ["Error"]          = "오류",
-        ["Preferences"]    = "⚙️ 환경 설정",
+        ["Preferences"]    = "환경 설정",
         ["ThemeLabel"]     = "테마",
         ["ThemeSystem"]    = "시스템 설정",
         ["ThemeDark"]      = "다크",
@@ -52,8 +52,8 @@ public static class Strings
 
     private static readonly Dictionary<string, string> En = new()
     {
-        ["Settings"]       = "📋 Group Settings",
-        ["Close"]          = "❌ Close",
+        ["Settings"]       = "Group Settings",
+        ["Close"]          = "Close",
         ["EditorTitle"]    = "Group Settings",
         ["GroupName"]      = "Group Name",
         ["AppList"]        = "Registered Apps",
@@ -70,7 +70,7 @@ public static class Strings
         ["ErrorLoad"]      = "Failed to load config",
         ["ErrorLaunch"]    = "Failed to launch",
         ["Error"]          = "Error",
-        ["Preferences"]    = "⚙️ Preferences",
+        ["Preferences"]    = "Preferences",
         ["ThemeLabel"]     = "Theme",
         ["ThemeSystem"]    = "System",
         ["ThemeDark"]      = "Dark",

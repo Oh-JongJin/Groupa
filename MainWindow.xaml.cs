@@ -85,12 +85,11 @@ public partial class MainWindow : Window
         _configPath = AppPaths.ConfigPath;
 
         // Apply localized strings
-        BtnSettings.Content = Strings.Get("Settings");
-        BtnClose.Content = Strings.Get("Close");
+        TxtSettings.Text = Strings.Get("Settings");
 
         LoadConfigFast();
 
-        BtnPreferences.Content = Strings.Get("Preferences");
+        TxtPreferences.Text = Strings.Get("Preferences");
         EmptyText.Text = Strings.Get("EmptyGroup");
         BtnEmptyAdd.Content = Strings.Get("AddApp");
         BtnUndo.Content = Strings.Get("Undo");
@@ -834,11 +833,6 @@ public partial class MainWindow : Window
             SaveConfig(_config);
         }
         catch { }
-    }
-
-    private void Close_Click(object sender, RoutedEventArgs e)
-    {
-        SafeClose();
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
